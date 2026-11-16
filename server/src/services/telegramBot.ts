@@ -324,21 +324,41 @@ export async function startTelegramBot(): Promise<void> {
   const bot = getTelegramBot();
   if (!bot) return;
 
-  try {
-    isBotRunning = true;
-    // Non-blocking start
-    bot.start({
+  stopRequested = false;
+  isBotRunning = true;
+  runPolling(bot, 0);
+}
+
+let stopRequested = false;
+
+/**
+ * Run long polling; if it stops unexpectedly (409 conflict, network error),
+ * restart automatically with a growing delay (5 s … 60 s) instead of staying dead.
+ */
+function runPolling(bot: NonNullable<ReturnType<typeof getTelegramBot>>, attempt: number): void {
+  bot
+    .start({
       onStart: (botInfo) => {
+        attempt = 0;
         console.log(`✅ [TelegramBot] Started polling as @${botInfo.username}`);
       },
-    }).catch((err) => {
-      isBotRunning = false;
-      console.warn('[TelegramBot] Polling stopped or network error:', err.message || err);
+    })
+    .then(() => {
+      if (!stopRequested) scheduleRestart(bot, attempt);
+    })
+    .catch((err) => {
+      console.warn('[TelegramBot] Polling stopped or network error:', err?.message || err);
+      if (!stopRequested) scheduleRestart(bot, attempt);
+      else isBotRunning = false;
     });
-  } catch (err: any) {
-    isBotRunning = false;
-    console.warn('[TelegramBot] Could not start polling:', err.message || err);
-  }
+}
+
+function scheduleRestart(bot: NonNullable<ReturnType<typeof getTelegramBot>>, attempt: number): void {
+  const delay = Math.min(60_000, 5_000 * (attempt + 1));
+  console.log(`[TelegramBot] Restarting polling in ${delay / 1000}s…`);
+  setTimeout(() => {
+    if (!stopRequested) runPolling(bot, attempt + 1);
+  }, delay).unref?.();
 }
 
 /**
@@ -346,6 +366,7 @@ export async function startTelegramBot(): Promise<void> {
  */
 export async function stopTelegramBot(): Promise<void> {
   if (!botInstance || !isBotRunning) return;
+  stopRequested = true;
   try {
     console.log('[TelegramBot] Stopping bot polling…');
     await botInstance.stop();
