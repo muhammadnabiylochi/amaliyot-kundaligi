@@ -8,13 +8,35 @@ export type NotificationEventType =
   | 'DIARY_APPROVED'
   | 'ATTENDANCE_RECORDED'
   | 'EVALUATION_COMPLETED'
-  | 'DIARY_REMINDER';
+  | 'DIARY_REMINDER'
+  | 'REVIEW_REMINDER'
+  | 'WEEKLY_SUMMARY'
+  | 'CHECKIN_LATE'
+  | 'ANNOUNCEMENT';
+
+/** Escapes user-provided text for Telegram HTML parse mode. */
+export function esc(s: string | null | undefined): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Inline keyboard shown to supervisors under a submitted diary entry. */
+export function reviewKeyboard(entryId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: '✅ Tasdiqlash', callback_data: `rv:a:${entryId}` },
+        { text: '↩️ Qaytarish', callback_data: `rv:r:${entryId}` },
+      ],
+    ],
+  };
+}
 
 interface SendNotificationParams {
   eventType: NotificationEventType;
   entityId: string;
   recipientId: string;
   messageText: string;
+  replyMarkup?: any;
 }
 
 /**
@@ -25,6 +47,7 @@ export async function dispatchNotification({
   entityId,
   recipientId,
   messageText,
+  replyMarkup,
 }: SendNotificationParams): Promise<{ sent: boolean; reason?: string }> {
   try {
     // 1. Idempotency Check: if already successfully sent, skip
@@ -72,7 +95,7 @@ export async function dispatchNotification({
     }
 
     // 3. Send message via Telegram bot
-    const sendResult = await sendTelegramMessage(tgAccount.telegramUserId, messageText);
+    const sendResult = await sendTelegramMessage(tgAccount.telegramUserId, messageText, replyMarkup);
 
     // 4. Record audit log
     await prisma.notificationLog.upsert({
@@ -113,6 +136,8 @@ export async function notifyDiarySubmitted(diaryEntryId: string): Promise<void> 
     const entry = await prisma.diaryEntry.findUnique({
       where: { id: diaryEntryId },
       include: {
+        planItem: { select: { title: true } },
+        _count: { select: { attachments: true } },
         internship: {
           include: {
             student: true,
@@ -129,58 +154,49 @@ export async function notifyDiarySubmitted(diaryEntryId: string): Promise<void> 
     const student = entry.internship.student;
     const dateStr = entry.entryDate.toISOString().split('T')[0];
     const hours = Number(entry.hours);
+    // A returned entry can be submitted again — each submission is a separate event.
+    const eventKey = `${entry.id}:${entry.submittedAt ? entry.submittedAt.getTime() : 0}`;
+    const excerpt = entry.description.length > 350 ? `${entry.description.slice(0, 350)}…` : entry.description;
 
     // 1. Notification to Student
     const studentMsg =
       `📋 <b>Kundalik muvaffaqiyatli topshirildi!</b>\n\n` +
       `📅 <b>Sana:</b> ${dateStr}\n` +
-      `📌 <b>Vazifa:</b> ${entry.taskTitle}\n` +
+      `📌 <b>Vazifa:</b> ${esc(entry.taskTitle)}\n` +
       `⏱ <b>Ishlangan vaqt:</b> ${hours} soat\n` +
-      `🏢 <b>Korxona:</b> ${entry.internship.company.name}\n\n` +
+      `🏢 <b>Korxona:</b> ${esc(entry.internship.company.name)}\n\n` +
       `Kundalik rahbarlar ko'rib chiqishi uchun yuborildi.\n` +
       `🔗 <a href="${env.CLIENT_URL}/diary">Kundalikni ko'rish</a>`;
 
     await dispatchNotification({
       eventType: 'DIARY_SUBMITTED',
-      entityId: entry.id,
+      entityId: eventKey,
       recipientId: student.id,
       messageText: studentMsg,
     });
 
-    // 2. Notification to Company Supervisor (if assigned)
-    if (entry.internship.companySupervisorId) {
-      const supervisorMsg =
-        `🔔 <b>Yangi kundalik yozuvi topshirildi!</b>\n\n` +
-        `👤 <b>Talaba:</b> ${student.fullName}\n` +
-        `📅 <b>Sana:</b> ${dateStr}\n` +
-        `📌 <b>Vazifa:</b> ${entry.taskTitle}\n` +
-        `⏱ <b>Ishlangan vaqt:</b> ${hours} soat\n\n` +
-        `Iltimos, kundalikni ko'rib chiqing va tasdiqlang yoki qaytaring:\n` +
-        `🔗 <a href="${env.CLIENT_URL}/reviews">Kundalikni tekshirish</a>`;
+    // 2. Supervisors get the full entry and approve/return buttons right in Telegram
+    const supervisorMsg =
+      `🔔 <b>Yangi kundalik yozuvi topshirildi</b>\n\n` +
+      `👤 <b>Talaba:</b> ${esc(student.fullName)}\n` +
+      `🏢 <b>Korxona:</b> ${esc(entry.internship.company.name)}\n` +
+      `📅 <b>Sana:</b> ${dateStr}   ⏱ ${hours} soat\n` +
+      (entry.planItem ? `🗂 <b>Reja bandi:</b> ${esc(entry.planItem.title)}\n` : '') +
+      `📌 <b>Mavzu:</b> ${esc(entry.taskTitle)}\n\n` +
+      `${esc(excerpt)}\n` +
+      (entry.result ? `\n🎯 <b>Natija:</b> ${esc(entry.result)}\n` : '') +
+      (entry._count.attachments ? `📎 Ilova fayllar: ${entry._count.attachments} ta\n` : '') +
+      `\nQuyidagi tugmalar orqali shu yerning o'zida tasdiqlang yoki izoh bilan qaytaring.\n` +
+      `🔗 <a href="${env.CLIENT_URL}/reviews">Saytda ochish</a>`;
 
+    for (const supervisorId of [entry.internship.companySupervisorId, entry.internship.universitySupervisorId]) {
+      if (!supervisorId) continue;
       await dispatchNotification({
         eventType: 'DIARY_SUBMITTED',
-        entityId: entry.id,
-        recipientId: entry.internship.companySupervisorId,
+        entityId: eventKey,
+        recipientId: supervisorId,
         messageText: supervisorMsg,
-      });
-    }
-
-    // 3. Notification to University Supervisor (if assigned)
-    if (entry.internship.universitySupervisorId) {
-      const uniMsg =
-        `🔔 <b>Talaba yangi kundalik topshirdi!</b>\n\n` +
-        `👤 <b>Talaba:</b> ${student.fullName}\n` +
-        `🏢 <b>Korxona:</b> ${entry.internship.company.name}\n` +
-        `📅 <b>Sana:</b> ${dateStr}\n` +
-        `📌 <b>Vazifa:</b> ${entry.taskTitle}\n\n` +
-        `🔗 <a href="${env.CLIENT_URL}/reviews">Kundalikni tekshirish</a>`;
-
-      await dispatchNotification({
-        eventType: 'DIARY_SUBMITTED',
-        entityId: entry.id,
-        recipientId: entry.internship.universitySupervisorId,
-        messageText: uniMsg,
+        replyMarkup: reviewKeyboard(entry.id),
       });
     }
   } catch (err: any) {
@@ -210,14 +226,14 @@ export async function notifyDiaryReturned(diaryEntryId: string, supervisorCommen
     const msg =
       `↩️ <b>Kundalik qayta ishlashga qaytarildi!</b>\n\n` +
       `📅 <b>Sana:</b> ${dateStr}\n` +
-      `📌 <b>Vazifa:</b> ${entry.taskTitle}` +
+      `📌 <b>Vazifa:</b> ${esc(entry.taskTitle)}` +
       commentText +
       `\nIltimos, ko'rsatilgan kamchiliklarni to'g'rilab, qayta topshiring.\n` +
       `🔗 <a href="${env.CLIENT_URL}/diary/edit/${entry.id}">Kundalikni tahrirlash</a>`;
 
     await dispatchNotification({
       eventType: 'DIARY_RETURNED',
-      entityId: entry.id,
+      entityId: `${entry.id}:${entry.updatedAt.getTime()}`,
       recipientId: entry.internship.studentId,
       messageText: msg,
     });
@@ -247,7 +263,7 @@ export async function notifyDiaryApproved(diaryEntryId: string): Promise<void> {
     const msg =
       `✅ <b>Kundalik tasdiqlandi!</b>\n\n` +
       `📅 <b>Sana:</b> ${dateStr}\n` +
-      `📌 <b>Vazifa:</b> ${entry.taskTitle}\n` +
+      `📌 <b>Vazifa:</b> ${esc(entry.taskTitle)}\n` +
       `⏱ <b>Qabul qilingan soat:</b> ${Number(entry.hours)} soat\n\n` +
       `Kundalik yozuvingiz rahbar tomonidan muvaffaqiyatli tasdiqlandi.\n` +
       `🔗 <a href="${env.CLIENT_URL}/diary">Kundaliklar ro'yxati</a>`;
@@ -299,7 +315,7 @@ export async function notifyAttendanceRecorded(attendanceId: string): Promise<vo
 
     await dispatchNotification({
       eventType: 'ATTENDANCE_RECORDED',
-      entityId: attendance.id,
+      entityId: `${attendance.id}:${attendance.updatedAt.getTime()}`,
       recipientId: attendance.internship.studentId,
       messageText: msg,
     });

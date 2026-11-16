@@ -78,7 +78,7 @@ export default function JournalPage() {
     }
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA');
 
   return (
     <div className="space-y-5">

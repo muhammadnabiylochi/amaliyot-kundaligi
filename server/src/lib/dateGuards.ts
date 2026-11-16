@@ -74,8 +74,9 @@ export function validateDiaryEntryDate(
   }
 
   // 2. entryDate must not be in the future (compare date-only, UTC)
-  const todayUtcStr = toUtcDateString(new Date());
-  if (entryDateStr > todayUtcStr) {
+  // "Today" is the local date in Uzbekistan (UTC+5): between 00:00 and 05:00 the UTC date is still yesterday.
+  const todayLocalStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+  if (entryDateStr > todayLocalStr) {
     return {
       valid: false,
       message: "Kundalik sanasi kelajakdagi sana bo'lishi mumkin emas",

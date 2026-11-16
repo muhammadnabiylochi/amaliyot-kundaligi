@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import crypto from 'crypto';
 import { env } from '../config/env';
 import { prisma } from '../lib/prisma';
+import { registerBotFeatures, menuFor, helpTextFor, BOT_COMMANDS } from './botFeatures';
 
 export interface TelegramBotStatus {
   isConfigured: boolean;
@@ -132,6 +133,16 @@ export async function verifyAndLinkAccount(
   };
 }
 
+/** Replies to a linking attempt; on success shows the role menu. */
+async function replyLinkResult(ctx: any, tgUserId: number, result: { success: boolean; message: string }) {
+  if (!result.success) {
+    await ctx.reply(result.message);
+    return;
+  }
+  const acc = await prisma.telegramAccount.findUnique({ where: { telegramUserId: BigInt(tgUserId) }, include: { user: true } });
+  await ctx.reply(`${result.message}\n\nPastdagi menyudan foydalaning. Imkoniyatlar: /help`, acc ? { reply_markup: menuFor(acc.user.role) } : {});
+}
+
 /**
  * Initialize Telegram Bot instance and register handlers
  */
@@ -154,7 +165,7 @@ export function getTelegramBot(): Bot | null {
       // Deep link payload: /start <CODE>
       if (payload && payload.length >= 6) {
         const result = await verifyAndLinkAccount(tgUserId, ctx.from?.username, payload);
-        await ctx.reply(result.message);
+        await replyLinkResult(ctx, tgUserId, result);
         return;
       }
 
@@ -168,7 +179,8 @@ export function getTelegramBot(): Bot | null {
         await ctx.reply(
           `👋 Assalomu alaykum, ${linked.user.fullName}!\n\n` +
           `Sizning Telegram akkauntingiz “Elektron amaliyot kundaligi” tizimiga allaqachon bog'langan.\n\n` +
-          `📌 Buyruqlar ro'yxatini ko'rish uchun /help buyrug'ini bosing.`
+          `Pastdagi menyudan foydalaning, imkoniyatlar ro'yxati: /help`,
+          { reply_markup: menuFor(linked.user.role) }
         );
       } else {
         await ctx.reply(
@@ -183,16 +195,16 @@ export function getTelegramBot(): Bot | null {
       }
     });
 
-    // /help command
+    // /help command — role-aware
     bot.command('help', async (ctx) => {
-      await ctx.reply(
-        `🤖 Amaliyot Kundaligi Bot Buyruqlari:\n\n` +
-        `/start - Botni ishga tushirish va xush kelibsiz xabari\n` +
-        `/status - Akkaunt bog'lanish holatini tekshirish\n` +
-        `/unlink - Telegram akkauntini tizimdan uzish\n` +
-        `/help - Mavjud buyruqlar va yo'riqnoma\n\n` +
-        `🌐 Web-ilova manzili: ${env.CLIENT_URL}`
-      );
+      const acc = ctx.from
+        ? await prisma.telegramAccount.findUnique({ where: { telegramUserId: BigInt(ctx.from.id) }, include: { user: true } })
+        : null;
+      await ctx.reply(helpTextFor(acc?.user.role ?? null), {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+        ...(acc ? { reply_markup: menuFor(acc.user.role) } : {}),
+      });
     });
 
     // /status command
@@ -258,9 +270,13 @@ export function getTelegramBot(): Bot | null {
 
       await ctx.reply(
         `✅ Telegram akkauntingiz ${account.user.fullName} hisobidan muvaffaqiyatli uzildi.\n\n` +
-        `Qayta bog'lash uchun web-ilovadagi profilingizdan yangi kod olishingiz mumkin.`
+        `Qayta bog'lash uchun web-ilovadagi profilingizdan yangi kod olishingiz mumkin.`,
+        { reply_markup: { remove_keyboard: true } }
       );
     });
+
+    // Interactive features (menu, diary wizard, reviews, check-in, reports, announcements)
+    registerBotFeatures(bot);
 
     // Handle plain text message as verification code
     bot.on('message:text', async (ctx) => {
@@ -273,7 +289,7 @@ export function getTelegramBot(): Bot | null {
       // Check if text looks like a 6-character code
       if (/^[A-Za-z0-9]{6}$/.test(text)) {
         const result = await verifyAndLinkAccount(tgUserId, ctx.from.username, text);
-        await ctx.reply(result.message);
+        await replyLinkResult(ctx, tgUserId, result);
         return;
       }
 
@@ -288,9 +304,10 @@ export function getTelegramBot(): Bot | null {
           `Yordam uchun: /help`
         );
       } else {
+        const user = await prisma.user.findUnique({ where: { id: account.userId } });
         await ctx.reply(
-          `ℹ️ Sizning akkauntingiz tizimga ulangan. Barcha muhim bildirishnomalar shu yerga yuboriladi.\n` +
-          `Holatni ko'rish: /status`
+          `ℹ️ Buyruqni tushunmadim. Pastdagi menyudan foydalaning yoki /help ni bosing.`,
+          user ? { reply_markup: menuFor(user.role) } : {}
         );
       }
     });
@@ -341,6 +358,7 @@ function runPolling(bot: NonNullable<ReturnType<typeof getTelegramBot>>, attempt
       onStart: (botInfo) => {
         attempt = 0;
         console.log(`✅ [TelegramBot] Started polling as @${botInfo.username}`);
+        void bot.api.setMyCommands(BOT_COMMANDS).catch((e) => console.warn('[TelegramBot] setMyCommands:', e?.message || e));
       },
     })
     .then(() => {
@@ -382,7 +400,8 @@ export async function stopTelegramBot(): Promise<void> {
  */
 export async function sendTelegramMessage(
   telegramUserId: bigint | number,
-  text: string
+  text: string,
+  replyMarkup?: any
 ): Promise<{ success: boolean; error?: string }> {
   const bot = getTelegramBot();
   if (!bot || !isTelegramTokenValid()) {
@@ -393,6 +412,7 @@ export async function sendTelegramMessage(
     await bot.api.sendMessage(Number(telegramUserId), text, {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
     return { success: true };
   } catch (err: any) {

@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { dispatchNotification } from './notificationService';
+import { dispatchNotification, esc } from './notificationService';
 import { ymd, todayTashkent } from '../lib/http';
 
 /** Last `n` working days (Mon–Fri) before and including `from`. */
@@ -91,6 +91,93 @@ export async function sendManualReminder(internshipId: string, senderName: strin
   return { ok: false as const, message: `Eslatma yuborilmadi: ${r.reason ?? "noma'lum xato"}`, missing };
 }
 
+/** Supervisors who have SUBMITTED entries waiting longer than `olderThanHours`. One reminder per supervisor per day. */
+export async function runPendingReviewReminders(olderThanHours = 48): Promise<{ supervisors: number; reminded: number }> {
+  const cutoff = new Date(Date.now() - olderThanHours * 3600 * 1000);
+  const stale = await prisma.diaryEntry.findMany({
+    where: { status: 'SUBMITTED', submittedAt: { lte: cutoff }, internship: { status: 'ACTIVE' } },
+    select: { internship: { select: { companySupervisorId: true, universitySupervisorId: true } } },
+  });
+  const counts = new Map<string, number>();
+  for (const e of stale) {
+    for (const id of [e.internship.companySupervisorId, e.internship.universitySupervisorId]) {
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  const day = ymd(todayTashkent());
+  let reminded = 0;
+  for (const [supervisorId, n] of counts) {
+    const r = await dispatchNotification({
+      eventType: 'REVIEW_REMINDER',
+      entityId: `${supervisorId}:${day}`,
+      recipientId: supervisorId,
+      messageText:
+        `⏳ <b>Tekshiruvni kutayotgan kundaliklar</b>\n\n` +
+        `${n} ta kundalik yozuvi ${Math.round(olderThanHours / 24)} kundan ortiq vaqtdan beri tasdiqlanmagan. ` +
+        `Talabalar o'z vaqtida javob olishi uchun ularni ko'rib chiqing.`,
+      replyMarkup: { inline_keyboard: [[{ text: "📋 Ko'rib chiqish", callback_data: 'tk' }]] },
+    });
+    if (r.sent) reminded++;
+  }
+  return { supervisors: counts.size, reminded };
+}
+
+/** Friday summary for each supervisor: this week's activity per student. */
+export async function runWeeklySummaries(): Promise<{ supervisors: number; sent: number }> {
+  const today = todayTashkent();
+  const monday = new Date(today);
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() || 7) - 1));
+  const weekKey = ymd(monday);
+  const its = await prisma.internship.findMany({
+    where: { status: 'ACTIVE' },
+    include: {
+      student: { select: { fullName: true } },
+      diaryEntries: { where: { entryDate: { gte: monday, lte: today } }, select: { status: true, hours: true } },
+      attendances: { where: { attendanceDate: { gte: monday, lte: today } }, select: { status: true } },
+    },
+  });
+  const workDays = lastWorkingDays(today, 5).filter((d) => d >= monday).length;
+  const bySupervisor = new Map<string, string[]>();
+  const pendingBy = new Map<string, number>();
+  for (const it of its) {
+    const written = it.diaryEntries.filter((e) => e.status !== 'DRAFT').length;
+    const approved = it.diaryEntries.filter((e) => e.status === 'APPROVED');
+    const pending = it.diaryEntries.filter((e) => e.status === 'SUBMITTED').length;
+    const hours = approved.reduce((a, e) => a + Number(e.hours), 0);
+    const present = it.attendances.filter((a) => a.status === 'PRESENT' || a.status === 'LATE').length;
+    const late = it.attendances.filter((a) => a.status === 'LATE').length;
+    const line =
+      `• ${esc(it.student.fullName)}: ${written}/${workDays} kun yozilgan, ✅${approved.length} (${hours} soat)` +
+      (pending ? `, ⏳${pending}` : '') +
+      (it.attendances.length ? ` · 🕒 ${present}/${it.attendances.length}${late ? ` (${late} kechikish)` : ''}` : '') +
+      (written < workDays - 1 ? ' ⚠️' : '');
+    for (const id of [it.companySupervisorId, it.universitySupervisorId]) {
+      if (!id) continue;
+      if (!bySupervisor.has(id)) bySupervisor.set(id, []);
+      bySupervisor.get(id)!.push(line);
+      pendingBy.set(id, (pendingBy.get(id) ?? 0) + pending);
+    }
+  }
+  let sent = 0;
+  for (const [supervisorId, lines] of bySupervisor) {
+    const pending = pendingBy.get(supervisorId) ?? 0;
+    const r = await dispatchNotification({
+      eventType: 'WEEKLY_SUMMARY',
+      entityId: `${supervisorId}:${weekKey}`,
+      recipientId: supervisorId,
+      messageText:
+        `🗓 <b>Haftalik xulosa</b> (${weekKey} — ${ymd(today)})\n\n` +
+        lines.slice(0, 40).join('\n') +
+        (lines.length > 40 ? `\n… yana ${lines.length - 40} ta talaba` : '') +
+        `\n\n⚠️ — hafta davomida kundalik yetarli yozilmagan` +
+        (pending ? `\n⏳ Tekshiruvni kutayotganlar: ${pending} ta` : ''),
+      replyMarkup: pending ? { inline_keyboard: [[{ text: "📋 Ko'rib chiqish", callback_data: 'tk' }]] } : undefined,
+    });
+    if (r.sent) sent++;
+  }
+  return { supervisors: bySupervisor.size, sent };
+}
+
 let timer: NodeJS.Timeout | null = null;
 
 /** Checks every 15 minutes; fires once per day after REMINDER_HOUR (Asia/Tashkent). */
@@ -106,6 +193,12 @@ export function startReminderScheduler(): void {
       try {
         const r = await runDailyReminders();
         console.log(`⏰ [Reminders] ${day}: ${r.checked} ta faol amaliyot tekshirildi, ${r.reminded} ta eslatma yuborildi`);
+        const p = await runPendingReviewReminders();
+        console.log(`⏰ [Reminders] ${day}: ${p.supervisors} ta rahbarda kechikkan tekshiruv, ${p.reminded} ta eslatma`);
+        if (todayTashkent().getUTCDay() === 5) {
+          const w = await runWeeklySummaries();
+          console.log(`🗓 [Weekly] ${w.sent}/${w.supervisors} ta rahbarga haftalik xulosa yuborildi`);
+        }
       } catch (e: any) {
         console.warn('[Reminders] error:', e.message || e);
       }

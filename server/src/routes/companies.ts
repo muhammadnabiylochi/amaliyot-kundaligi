@@ -11,6 +11,9 @@ const companySchema = z.object({
   address: z.string().trim().min(3, 'Manzil kiritilishi shart'),
   contactPhone: z.string().trim().optional().nullable(),
   description: z.string().trim().optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  checkinRadius: z.number().int().min(50, 'Radius kamida 50 m').max(5000, 'Radius 5000 m dan oshmasin').optional(),
 });
 
 /** GET /api/companies — list with internship counts */
@@ -28,6 +31,9 @@ router.get('/', authenticate, authorize('ADMIN', 'COMPANY_SUPERVISOR', 'UNIVERSI
         address: c.address,
         contactPhone: c.contactPhone,
         description: c.description,
+        latitude: c.latitude,
+        longitude: c.longitude,
+        checkinRadius: c.checkinRadius,
         internshipCount: c._count.internships,
         createdAt: c.createdAt.toISOString(),
       })),

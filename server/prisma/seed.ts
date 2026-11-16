@@ -147,22 +147,22 @@ async function main() {
     uzcard: await prisma.company.upsert({
       where: { name: 'Uzcard MChJ' },
       update: {},
-      create: { name: 'Uzcard MChJ', address: "Toshkent sh., Mirobod tumani, Oybek ko'chasi, 12-uy", contactPhone: '+998 71 200-28-28', description: 'Yagona umumrespublika protsessing markazi' },
+      create: { latitude: 41.2946, longitude: 69.2777, name: 'Uzcard MChJ', address: "Toshkent sh., Mirobod tumani, Oybek ko'chasi, 12-uy", contactPhone: '+998 71 200-28-28', description: 'Yagona umumrespublika protsessing markazi' },
     }),
     epam: await prisma.company.upsert({
       where: { name: 'EPAM Systems' },
       update: {},
-      create: { name: 'EPAM Systems', address: "Toshkent sh., Shayxontohur tumani, Navoiy ko'chasi, 1A", contactPhone: '+998 71 202-00-00', description: "Xalqaro dasturiy ta'minot injiniringi kompaniyasi" },
+      create: { latitude: 41.3205, longitude: 69.2470, name: 'EPAM Systems', address: "Toshkent sh., Shayxontohur tumani, Navoiy ko'chasi, 1A", contactPhone: '+998 71 202-00-00', description: "Xalqaro dasturiy ta'minot injiniringi kompaniyasi" },
     }),
     artel: await prisma.company.upsert({
       where: { name: 'Artel Electronics' },
       update: {},
-      create: { name: 'Artel Electronics', address: 'Toshkent sh., Yangihayot tumani, Sanoat zonasi', contactPhone: '+998 71 205-55-55', description: 'Maishiy texnika va elektronika ishlab chiqaruvchisi' },
+      create: { latitude: 41.2195, longitude: 69.2275, name: 'Artel Electronics', address: 'Toshkent sh., Yangihayot tumani, Sanoat zonasi', contactPhone: '+998 71 205-55-55', description: 'Maishiy texnika va elektronika ishlab chiqaruvchisi' },
     }),
     uztelecom: await prisma.company.upsert({
       where: { name: "O'zbektelekom AK" },
       update: {},
-      create: { name: "O'zbektelekom AK", address: "Toshkent sh., Amir Temur shoh ko'chasi, 24", contactPhone: '+998 71 233-42-00', description: 'Milliy telekommunikatsiya operatori' },
+      create: { latitude: 41.3237, longitude: 69.2829, name: "O'zbektelekom AK", address: "Toshkent sh., Amir Temur shoh ko'chasi, 24", contactPhone: '+998 71 233-42-00', description: 'Milliy telekommunikatsiya operatori' },
     }),
   };
 

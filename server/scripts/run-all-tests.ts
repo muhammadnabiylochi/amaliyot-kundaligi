@@ -19,6 +19,7 @@ const scripts = [
   'test-reports-export',
   'audit-security',
   'test-new-features',
+  'test-bot-features',
   ...(process.argv.includes('--with-telegram') ? ['test-telegram'] : []),
 ];
 

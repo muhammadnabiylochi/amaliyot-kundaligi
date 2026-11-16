@@ -3,12 +3,9 @@ import { prisma } from '../lib/prisma';
 import { DiaryEntryStatus } from '@prisma/client';
 import { z } from 'zod';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import {
-  notifyDiarySubmitted,
-  notifyDiaryReturned,
-  notifyDiaryApproved,
-} from '../services/notificationService';
+import { notifyDiarySubmitted } from '../services/notificationService';
 import { validateDiaryEntryDate } from '../lib/dateGuards';
+import { reviewDiaryEntry } from '../services/diaryActions';
 
 const router = Router();
 
@@ -555,100 +552,12 @@ router.post('/:id/review', authenticate, async (req: AuthenticatedRequest, res: 
     }
     const { decision, comment } = parseResult.data;
 
-    if (user.role === 'STUDENT') {
-      res.status(403).json({
-        error: { message: "Talabalar kundaliklarni tekshirish yoki baholash huquqiga ega emas", status: 403 },
-      });
+    const r = await reviewDiaryEntry(user, id, decision, comment);
+    if (!r.ok) {
+      res.status(r.status).json({ error: { message: r.message, status: r.status } });
       return;
     }
-
-    const entry = await prisma.diaryEntry.findUnique({
-      where: { id },
-      include: { internship: true },
-    });
-
-    if (!entry) {
-      res.status(404).json({ error: { message: "Kundalik yozuvi topilmadi", status: 404 } });
-      return;
-    }
-
-    // Business flow check: STRICTLY ONLY SUBMITTED entries can be reviewed!
-    if (entry.status !== 'SUBMITTED') {
-      res.status(400).json({
-        error: {
-          message: `Faqat topshirilgan (SUBMITTED) holatdagi kundaliklarni baholash mumkin. Ushbu yozuv holati: ${entry.status}.`,
-          status: 400,
-        },
-      });
-      return;
-    }
-
-    // If supervisor, check assignment
-    if (
-      user.role === 'COMPANY_SUPERVISOR' &&
-      entry.internship.companySupervisorId !== user.id
-    ) {
-      res.status(403).json({
-        error: { message: "Ushbu amaliyot sizning korxonangizga yoki sizga biriktirilmagan", status: 403 },
-      });
-      return;
-    }
-
-    if (
-      user.role === 'UNIVERSITY_SUPERVISOR' &&
-      entry.internship.universitySupervisorId !== user.id
-    ) {
-      res.status(403).json({
-        error: { message: "Ushbu talaba sizga biriktirilmagan", status: 403 },
-      });
-      return;
-    }
-
-    const reviewDecision = decision === 'approved' ? 'APPROVED' : 'RETURNED';
-    const entryStatus: DiaryEntryStatus = decision === 'approved' ? 'APPROVED' : 'RETURNED';
-    const finalComment = comment?.trim() || (decision === 'approved' ? 'Tasdiqlandi' : 'Qayta ishlashga qaytarildi');
-
-    // Bug 5: Atomic status transition using prisma.diaryEntry.updateMany({ where: { id, status: 'SUBMITTED' }, data: {...} }) inside $transaction
-    // Return 409 if count === 0 (race condition guard).
-    const result = await prisma.$transaction(async (tx) => {
-      const updateResult = await tx.diaryEntry.updateMany({
-        where: { id, status: 'SUBMITTED' },
-        data: { status: entryStatus },
-      });
-
-      if (updateResult.count === 0) {
-        return null;
-      }
-
-      await tx.diaryReview.create({
-        data: {
-          diaryEntryId: id,
-          reviewerId: user.id,
-          decision: reviewDecision,
-          comment: finalComment,
-        },
-      });
-
-      return tx.diaryEntry.findUnique({
-        where: { id },
-      });
-    });
-
-    if (!result) {
-      res.status(409).json({
-        error: {
-          message: "Kundalik holati o'zgargan yoki boshqa rahbar tomonidan ko'rib chiqilgan (faqat topshirilgan kundalikni baholash mumkin)",
-          status: 409,
-        },
-      });
-      return;
-    }
-
-    if (entryStatus === 'APPROVED') {
-      void notifyDiaryApproved(id);
-    } else if (entryStatus === 'RETURNED') {
-      void notifyDiaryReturned(id, finalComment);
-    }
+    const result = await prisma.diaryEntry.findUnique({ where: { id } });
 
     res.json({
       success: true,

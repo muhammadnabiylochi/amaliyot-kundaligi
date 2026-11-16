@@ -111,6 +111,9 @@ export interface Company {
   address: string;
   contactPhone?: string | null;
   description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  checkinRadius?: number;
   internshipCount: number;
 }
 

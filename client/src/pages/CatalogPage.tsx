@@ -44,7 +44,14 @@ export default function CatalogPage() {
     setFormError(null);
     if (kind === 'companies') {
       const c = item as Company | undefined;
-      setForm({ name: c?.name ?? '', address: c?.address ?? '', contactPhone: c?.contactPhone ?? '', description: c?.description ?? '' });
+      setForm({
+        name: c?.name ?? '',
+        address: c?.address ?? '',
+        contactPhone: c?.contactPhone ?? '',
+        description: c?.description ?? '',
+        coords: c?.latitude != null && c?.longitude != null ? `${c.latitude}, ${c.longitude}` : '',
+        checkinRadius: String(c?.checkinRadius ?? 300),
+      });
     } else {
       const g = item as StudentGroup | undefined;
       setForm({ name: g?.name ?? '', faculty: g?.faculty ?? '', studyProgram: g?.studyProgram ?? '' });
@@ -58,7 +65,23 @@ export default function CatalogPage() {
     setFormError(null);
     try {
       if (modal.kind === 'companies') {
-        const p = { name: form.name, address: form.address, contactPhone: form.contactPhone || null, description: form.description || null };
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        if (form.coords?.trim()) {
+          const m = form.coords.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)$/);
+          if (!m) throw new Error(t("Koordinatalar «41.311081, 69.240562» ko'rinishida bo'lishi kerak"));
+          latitude = Number(m[1]);
+          longitude = Number(m[2]);
+        }
+        const p = {
+          name: form.name,
+          address: form.address,
+          contactPhone: form.contactPhone || null,
+          description: form.description || null,
+          latitude,
+          longitude,
+          checkinRadius: Number(form.checkinRadius) || 300,
+        };
         if (modal.item) await updateCompany(modal.item.id, p);
         else await createCompany(p);
       } else {
@@ -147,6 +170,11 @@ export default function CatalogPage() {
                   <div className="flex gap-2">
                     <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" /> {c.address}
                   </div>
+                  {c.latitude != null && (
+                    <div className="flex items-start gap-1.5 text-emerald-700">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {t('Geolokatsiyali davomat yoqilgan')} ({c.checkinRadius} m)
+                    </div>
+                  )}
                   {c.contactPhone && (
                     <div className="flex gap-2">
                       <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" /> {c.contactPhone}
@@ -235,6 +263,19 @@ export default function CatalogPage() {
               <Field label={t('Faoliyat yo‘nalishi / tavsif')}>
                 <Textarea rows={3} value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Field label={t('Koordinatalar (kenglik, uzunlik)')}>
+                    <Input value={form.coords ?? ''} onChange={(e) => setForm({ ...form, coords: e.target.value })} placeholder="41.311081, 69.240562" />
+                  </Field>
+                </div>
+                <Field label={t('Radius (m)')}>
+                  <Input type="number" min={50} max={5000} value={form.checkinRadius ?? '300'} onChange={(e) => setForm({ ...form, checkinRadius: e.target.value })} />
+                </Field>
+              </div>
+              <p className="text-[11px] text-slate-500 -mt-2">
+                {t("Talaba Telegram botda «📍 Keldim» tugmasini bosganda joylashuvi shu nuqtadan radius ichida bo'lsa, davomat avtomatik belgilanadi. Koordinatani Google Maps'da joy ustiga sichqonchaning o'ng tugmasini bosib olish mumkin.")}
+              </p>
             </>
           ) : (
             <>

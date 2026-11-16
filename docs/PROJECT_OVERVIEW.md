@@ -85,6 +85,21 @@ Elektron amaliyot kundaligi — universitetda amaliyotni o'tayotgan talabalarnin
 - Avtomatik bildirishnomalar: kundalik topshirildi, tasdiqlandi, qaytarildi
 - Bog'lanmagan foydalanuvchilar uchun `SKIPPED_NO_TG` (tizim to'xtamaydi)
 
+### 4.7 Telegram Bot — interaktiv imkoniyatlar
+Bot faqat xabar yubormaydi, undan to'liq ishlash mumkin. Barcha amallar sayt bilan bir xil biznes qoidalari (`services/diaryActions.ts`) orqali bajariladi.
+
+| Rol | Imkoniyat | Buyruq / tugma |
+|---|---|---|
+| Talaba | Kundalik yozish: sana → reja bandi → mavzu → soat → tavsif → natija → rasm (5 tagacha) → yuborish yoki qoralama | `/yoz`, 📝 Kundalik yozish |
+| Talaba | Geolokatsiya orqali davomat: korxonadan radius (standart 300 m) ichida bo'lsa «keldi», `CHECKIN_LATE_AFTER` (09:15) dan keyin «kechikdi»; forward qilingan joylashuv rad etiladi | 📍 Keldim |
+| Talaba | Holat: kundaliklar, tasdiqlangan soat, davomat %, reja bajarilishi, yozilmagan kunlar | `/holat`, 📊 Holatim |
+| Barcha | QR-kodli yakuniy hisobot PDF chatga | `/hisobot`, 📄 Hisobot |
+| Rahbar | Yangi kundalik xabari ostida ✅ Tasdiqlash / ↩️ Qaytarish (izoh so'raladi) tugmalari; tekshiruv navbati | `/tekshir`, 📋 Tekshirish |
+| Rahbar | 48 soatdan ortiq tekshirilmagan yozuvlar haqida kunlik eslatma; har juma haftalik xulosa | avtomatik |
+| Admin | Tizim statistikasi; hammaga / talabalarga / rahbarlarga e'lon | `/holat`, `/elon` |
+
+Korxona koordinatalari «Katalog → Korxonalar» formasida kiritiladi (koordinatalar va radius).
+
 ## 5. Texnologiyalar To'plami
 
 ```
