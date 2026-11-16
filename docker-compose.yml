@@ -32,7 +32,7 @@ services:
       CLIENT_URL: ${PUBLIC_URL:-http://localhost:3001}
       CORS_ORIGINS: ${PUBLIC_URL:-http://localhost:3001}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-amaliyot_kundaligibot}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-amaliyot_kundalik_uz_bot}
       REMINDER_HOUR: ${REMINDER_HOUR:-18}
     ports:
       - '${APP_PORT:-3001}:3001'

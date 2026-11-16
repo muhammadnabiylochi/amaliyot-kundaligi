@@ -634,8 +634,8 @@ export async function fetchTelegramStatus(): Promise<TelegramStatusResponse> {
   }
   return {
     isLinked: false,
-    botUsername: 'amaliyot_kundaligibot',
-    botUrl: 'https://t.me/amaliyot_kundaligibot',
+    botUsername: 'amaliyot_kundalik_uz_bot',
+    botUrl: 'https://t.me/amaliyot_kundalik_uz_bot',
   };
 }
 

@@ -173,6 +173,7 @@ export default function ProfilePage(): JSX.Element {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const botName = tgStatus?.botUsername ?? 'amaliyot_kundalik_uz_bot';
   const roleNames: Record<string, string> = Object.fromEntries(Object.entries(ROLE_LABELS).map(([k, v]) => [k, t(v)]));
 
   return (
@@ -359,7 +360,7 @@ export default function ProfilePage(): JSX.Element {
                   )}
                 </div>
                 <CardDescription className="text-slate-500 mt-0.5">
-                  Rasmiy bot: <a href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a>
+                  Rasmiy bot: <a href={tgStatus?.botUrl ?? `https://t.me/${botName}`} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@{botName}</a>
                 </CardDescription>
               </div>
             </div>
@@ -405,7 +406,7 @@ export default function ProfilePage(): JSX.Element {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"}
+                    href={tgStatus?.botUrl ?? `https://t.me/${botName}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-[#229ED9] hover:bg-[#1e8bc0] transition-colors shadow-xs"
@@ -434,7 +435,7 @@ export default function ProfilePage(): JSX.Element {
                     Kundalik, davomat va baholash bildirishnomalarini Telegram'da oling
                   </h4>
                   <p className="text-xs text-slate-500 max-w-xl">
-                    Akkauntingizni <strong className="text-slate-700">@amaliyot_kundaligibot</strong> botiga bog'lang va kundalik holati, davomat va yakuniy ballar bo'yicha tezkor xabarlarni kuzatib boring.
+                    Akkauntingizni <strong className="text-slate-700">@{botName}</strong> botiga bog'lang va kundalik holati, davomat va yakuniy ballar bo'yicha tezkor xabarlarni kuzatib boring.
                   </p>
                 </div>
 
@@ -517,7 +518,7 @@ export default function ProfilePage(): JSX.Element {
                       <div className="p-3.5 rounded-xl bg-white/80 border border-indigo-100 text-xs text-slate-600 space-y-1.5">
                         <p className="font-semibold text-slate-800">Qadamlar:</p>
                         <ol className="list-decimal list-inside space-y-1 pl-1">
-                          <li>Telegram'da <a href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a> botini oching.</li>
+                          <li>Telegram'da <a href={tgStatus?.botUrl ?? `https://t.me/${botName}`} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@{botName}</a> botini oching.</li>
                           <li>Botga <code className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-bold font-mono">/start</code> buyrug'ini yuboring.</li>
                           <li>Yuqoridagi 6 xonali kodni (<span className="font-mono font-bold text-indigo-900">{linkData.code}</span>) botga xabar sifatida yuboring.</li>
                           <li>Muvaffaqiyatli javob olgach, bu yerdagi "Yangilash" tugmasini bosing!</li>

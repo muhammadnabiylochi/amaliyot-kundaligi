@@ -18,7 +18,7 @@ router.get('/status', authenticate, async (req: AuthenticatedRequest, res: Respo
       where: { userId: user.id },
     });
 
-    const botUsername = env.TELEGRAM_BOT_USERNAME || 'amaliyot_kundaligibot';
+    const botUsername = env.TELEGRAM_BOT_USERNAME || 'amaliyot_kundalik_uz_bot';
     const botUrl = `https://t.me/${botUsername}`;
 
     if (!tgAccount) {
@@ -56,7 +56,7 @@ router.get('/status', authenticate, async (req: AuthenticatedRequest, res: Respo
 router.post('/generate-link-code', authenticate, async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = req.user!;
-    const botUsername = env.TELEGRAM_BOT_USERNAME || 'amaliyot_kundaligibot';
+    const botUsername = env.TELEGRAM_BOT_USERNAME || 'amaliyot_kundalik_uz_bot';
 
     // 1. Generate code and hash
     const plainCode = generateRandomCode();

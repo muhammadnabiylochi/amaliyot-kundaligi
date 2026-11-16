@@ -9,12 +9,13 @@ const envSchema = z.object({
     .transform(Number)
     .refine((n) => n > 0 && n < 65536, 'PORT must be between 1 and 65535'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  CORS_ORIGINS: z.string().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173'),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters long'),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  CLIENT_URL: z.string().default('http://localhost:5173'),
+  // Public URL used in QR codes / Telegram links. On Render it defaults to the service's own URL.
+  CLIENT_URL: z.string().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173'),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
-  TELEGRAM_BOT_USERNAME: z.string().default('amaliyot_kundaligibot'),
+  TELEGRAM_BOT_USERNAME: z.string().default('amaliyot_kundalik_uz_bot'),
 });
 
 const parsed = envSchema.safeParse(process.env);

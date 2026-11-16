@@ -31,5 +31,5 @@ ENV NODE_ENV=production \
 EXPOSE 3001
 VOLUME ["/app/server/uploads"]
 
-# Apply pending migrations, then start the API (which also serves the client)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Apply migrations, load demo data into an empty DB when SEED_DEMO_DATA=true, then start the API (+ client)
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed-if-empty.ts && node dist/index.js"]
