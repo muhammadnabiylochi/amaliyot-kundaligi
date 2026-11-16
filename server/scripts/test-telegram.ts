@@ -1,5 +1,5 @@
 /**
- * Comprehensive Test Suite for Telegram Bot Integration (@amaliyot_kundaligibot):
+ * Comprehensive Test Suite for Telegram Bot Integration (@amaliyot_kundalik_uz_bot):
  * Covers all 13 requirements specified by the user:
  * 1. Bot token fallback & safe initialization when token is missing/placeholder.
  * 2. Successful linking with 1-time verification code.
@@ -43,7 +43,7 @@ const prisma = new PrismaClient();
 
 async function runTelegramTests() {
   console.log('========================================================================');
-  console.log('🤖 TELEGRAM BOT INTEGRATSIYASI (@amaliyot_kundaligibot) — TEST SUITE');
+  console.log('🤖 TELEGRAM BOT INTEGRATSIYASI (@amaliyot_kundalik_uz_bot) — TEST SUITE');
   console.log('========================================================================\n');
 
   let passed = 0;
@@ -116,7 +116,7 @@ async function runTelegramTests() {
       Boolean(genData.data?.code) &&
       genData.data.code.length === 6 &&
       Boolean(genData.data.expiresAt) &&
-      genData.data.botUsername === 'amaliyot_kundaligibot',
+      genData.data.botUsername === 'amaliyot_kundalik_uz_bot',
       'Bir martalik 6 xonali tasdiqlash kodi va 10 daqiqa amal qilish muddati yaratildi'
     );
 

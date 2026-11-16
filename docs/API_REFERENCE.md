@@ -339,8 +339,8 @@ Yangi bog'lash kodi yaratish.
 {
   "linkCode": "abc123",
   "expiresAt": "2026-10-29T12:10:00.000Z",
-  "botUsername": "amaliyot_kundaligibot",
-  "deepLink": "https://t.me/amaliyot_kundaligibot?start=abc123"
+  "botUsername": "amaliyot_kundalik_uz_bot",
+  "deepLink": "https://t.me/amaliyot_kundalik_uz_bot?start=abc123"
 }
 ```
 

@@ -184,7 +184,7 @@ CLIENT_URL=http://localhost:5173
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE_MB=10
 TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
-TELEGRAM_BOT_USERNAME=amaliyot_kundaligibot
+TELEGRAM_BOT_USERNAME=amaliyot_kundalik_uz_bot
 ```
 
 ## 7. Production Deployment (Tavsiya etilgan)

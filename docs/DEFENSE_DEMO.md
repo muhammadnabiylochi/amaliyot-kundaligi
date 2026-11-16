@@ -1,7 +1,7 @@
 # Diplom Himoyasi — Demo Ssenariy
 
 **Loyiha:** Talabalarning amaliyotidagi faoliyatini nazorat qiluvchi elektron kundalik  
-**Bot:** [@amaliyot_kundaligibot](https://t.me/amaliyot_kundaligibot)
+**Bot:** [@amaliyot_kundalik_uz_bot](https://t.me/amaliyot_kundalik_uz_bot)
 
 ---
 
@@ -162,7 +162,7 @@ npm run dev   # port 5173
 ### 6.1 Bog'lash
 1. Talaba → **Profil** sahifasi
 2. **Telegram bog'lash** tugmasini bosing
-3. Kod va `t.me/amaliyot_kundaligibot?start=<kod>` havolasi chiqadi
+3. Kod va `t.me/amaliyot_kundalik_uz_bot?start=<kod>` havolasi chiqadi
 4. Telegram'da botni oching → `/start <kod>` → `✅ Akkaunt muvaffaqiyatli bog'landi`
 
 ### 6.2 Bildirishnomalar
@@ -198,7 +198,7 @@ Express API (port 3001)
     ▼
 PostgreSQL (internship_diary)
     +
-grammY → Telegram Bot API (@amaliyot_kundaligibot)
+grammY → Telegram Bot API (@amaliyot_kundalik_uz_bot)
 ```
 
 ---

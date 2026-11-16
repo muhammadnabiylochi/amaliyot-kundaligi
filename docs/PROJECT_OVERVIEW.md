@@ -80,7 +80,7 @@ Elektron amaliyot kundaligi — universitetda amaliyotni o'tayotgan talabalarnin
 - Barcha hisobotlar RBAC asosida chiqariladi
 
 ### 4.6 Telegram Bot Bildirishnomalari
-- Bot: `@amaliyot_kundaligibot`
+- Bot: `@amaliyot_kundalik_uz_bot`
 - Talaba profilidan Telegram akkauntini bog'lash (10 daqiqa kuchli, 3 urinish)
 - Avtomatik bildirishnomalar: kundalik topshirildi, tasdiqlandi, qaytarildi
 - Bog'lanmagan foydalanuvchilar uchun `SKIPPED_NO_TG` (tizim to'xtamaydi)
