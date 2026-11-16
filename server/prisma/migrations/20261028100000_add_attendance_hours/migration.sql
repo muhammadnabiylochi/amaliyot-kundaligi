@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Attendance" ADD COLUMN "hours" DECIMAL(4,1) NOT NULL DEFAULT 8.0;
