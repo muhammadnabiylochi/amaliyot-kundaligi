@@ -108,9 +108,12 @@ async function runBugfixTests() {
   // ──────────────────────────────────────────────────────────────────────────
   console.log('\n--- TEST GROUP 1: Date Validation (dateGuards) ---');
 
+  // Future dates are computed relative to today so the test never goes stale
+  const futureYmd = (days: number) => new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
+
   // 1a. POST with future date -> 400
   const futureRes = await request(app, 'POST', '/api/diary', studentToken, {
-    entryDate: '2026-11-05', // future (current is 2026-10-30)
+    entryDate: futureYmd(5), // always in the future
     taskTitle: 'Kelajakdagi ish',
     description: 'Kelajakda qilinadigan ish tavsifi',
     hours: 8,
@@ -153,7 +156,7 @@ async function runBugfixTests() {
 
   // 1d. PATCH date with future date -> 400
   const patchFutureRes = await request(app, 'PATCH', `/api/diary/${entryId}`, studentToken, {
-    entryDate: '2026-11-10',
+    entryDate: futureYmd(10),
   });
   assert(
     patchFutureRes.status === 400 && patchFutureRes.body.error?.message?.includes('kelajakdagi'),

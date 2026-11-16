@@ -4,7 +4,7 @@
   "description": "Internship Diary — Express API server",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
@@ -15,7 +15,9 @@
     "prisma:seed": "prisma db seed",
     "test:auth": "tsx scripts/test-auth.ts",
     "test:telegram": "tsx scripts/test-telegram.ts",
-    "test:audit": "tsx scripts/audit-security.ts"
+    "test:audit": "tsx scripts/audit-security.ts",
+    "test": "tsx scripts/run-all-tests.ts",
+    "test:new": "tsx scripts/test-new-features.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -35,7 +37,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.5.0",
     "pdfkit": "^0.20.2",
-    "uuid": "^14.0.3",
+    "qrcode": "^1.5.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -48,7 +50,7 @@
     "@types/multer": "^2.3.0",
     "@types/node": "^20.14.0",
     "@types/pdfkit": "^0.17.7",
-    "@types/uuid": "^10.0.0",
+    "@types/qrcode": "^1.5.5",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.0",

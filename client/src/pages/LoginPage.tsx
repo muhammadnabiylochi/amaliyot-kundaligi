@@ -3,15 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Button, Input, Card } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/i18n';
+
+// Quick demo profiles are shown only in development or when VITE_DEMO_MODE=true
+const DEMO = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t, lang, setLang } = useI18n();
 
-  const [email, setEmail] = useState('admin@edu.uz');
-  const [password, setPassword] = useState('DevPassword123!');
-  const [role, setRole] = useState<'admin' | 'supervisor' | 'student'>('admin');
+  const [email, setEmail] = useState(DEMO ? 'admin@edu.uz' : '');
+  const [password, setPassword] = useState(DEMO ? 'DevPassword123!' : '');
+  const [role, setRole] = useState<string>('admin');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,10 +42,13 @@ export default function LoginPage() {
           <GraduationCap className="h-8 w-8" />
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          Elektron Amaliyot Kundaligi
+          {t('Elektron Amaliyot Kundaligi')}
         </h2>
+        <button type="button" onClick={() => setLang(lang === 'uz' ? 'ru' : 'uz')} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">
+          {lang === 'uz' ? 'Русский язык' : "O'zbek tili"}
+        </button>
         <p className="mt-2 text-sm text-slate-600">
-          Universitet talabalari amaliyotini boshqarish va monitoring qilish tizimi
+          {t("Professional ta'lim muassasalari talabalari amaliyotini boshqarish va monitoring qilish tizimi")}
         </p>
       </div>
 
@@ -53,15 +62,17 @@ export default function LoginPage() {
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {DEMO && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                Lokal test profillari (Tezkor tanlash)
+                {t('Demo profillar (tezkor tanlash)')}
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'admin', label: 'Admin', email: 'admin@edu.uz' },
-                  { id: 'supervisor', label: 'Rahbar', email: 'sherzod.nazarov@uzcard.uz' },
-                  { id: 'student', label: 'Talaba', email: 'jasur.aliev@student.edu.uz' },
+                  { id: 'admin', label: t('Admin'), email: 'admin@edu.uz' },
+                  { id: 'supervisor', label: t('Korxona'), email: 'sherzod.nazarov@uzcard.uz' },
+                  { id: 'institution', label: t('Muassasa'), email: 'dilshod.toshmatov@edu.uz' },
+                  { id: 'student', label: t('Talaba'), email: 'jasur.aliev@student.edu.uz' },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -82,10 +93,11 @@ export default function LoginPage() {
                 ))}
               </div>
             </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                Elektron pochta
+                {t('Elektron pochta')}
               </label>
               <Input
                 type="email"
@@ -100,11 +112,11 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Parol
+                  {t('Parol')}
                 </label>
-                <a href="#forgot" className="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
-                  Parolni unutdingizmi?
-                </a>
+                <button type="button" onClick={() => setShowForgot((v) => !v)} className="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
+                  {t('Parolni unutdingizmi?')}
+                </button>
               </div>
               <Input
                 type="password"
@@ -115,21 +127,14 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                defaultChecked
-                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-xs text-slate-600">
-                Eslab qolish
-              </label>
-            </div>
+            {showForgot && (
+              <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-900">
+                {t("Parolni tiklash uchun amaliyot bo'limi administratoriga murojaat qiling: u sizga vaqtinchalik parol beradi, birinchi kirishda uni o'zingiz almashtirasiz.")}
+              </div>
+            )}
 
             <Button type="submit" className="w-full" isLoading={isLoading}>
-              <span>Tizimga kirish</span>
+              <span>{t('Tizimga kirish')}</span>
               <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </form>
@@ -137,16 +142,20 @@ export default function LoginPage() {
           <div className="mt-6 pt-6 border-t border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-500 justify-center">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>Yagona identifikatsiya (OneID) orqali xavfsiz himoyalangan</span>
+              <span>{t("Parollar shifrlangan holda saqlanadi, kirish urinishlari cheklangan")}</span>
             </div>
           </div>
         </Card>
 
-        {/* Development testing hint */}
-        <div className="mt-4 p-3 rounded-lg bg-slate-100/80 border border-slate-200 text-xs text-slate-600 space-y-1">
-          <div className="font-semibold text-slate-700">💡 Lokal test paroli:</div>
-          <div>Barcha sinov profillari uchun parol: <code className="bg-white px-1.5 py-0.5 rounded border text-indigo-600 font-mono">DevPassword123!</code></div>
-        </div>
+        {/* Development testing hint (demo mode only) */}
+        {DEMO && (
+          <div className="mt-4 p-3 rounded-lg bg-slate-100/80 border border-slate-200 text-xs text-slate-600 space-y-1">
+            <div className="font-semibold text-slate-700">💡 {t('Demo paroli')}:</div>
+            <div>
+              {t('Barcha demo profillar uchun parol')}: <code className="bg-white px-1.5 py-0.5 rounded border text-indigo-600 font-mono">DevPassword123!</code>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

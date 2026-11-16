@@ -7,7 +7,8 @@ export type NotificationEventType =
   | 'DIARY_RETURNED'
   | 'DIARY_APPROVED'
   | 'ATTENDANCE_RECORDED'
-  | 'EVALUATION_COMPLETED';
+  | 'EVALUATION_COMPLETED'
+  | 'DIARY_REMINDER';
 
 interface SendNotificationParams {
   eventType: NotificationEventType;
@@ -326,7 +327,7 @@ export async function notifyEvaluationCompleted(internshipId: string, finalScore
       `🎉 <b>Yakuniy amaliyot baholash natijasi tayyor!</b>\n\n` +
       `🏢 <b>Korxona:</b> ${internship.company.name}\n` +
       `⭐️ <b>Yakuniy umumiy ball:</b> <b>${finalScore}</b> / 100 ball\n\n` +
-      `Korxona va universitet rahbarlari tomonidan baholash to'liq yakunlandi.\n` +
+      `Korxona va ta'lim muassasasi rahbarlari tomonidan baholash to'liq yakunlandi.\n` +
       `Batafsil mezonlar va taqrizlarni ko'rish uchun quyidagi havolaga o'ting:\n` +
       `🔗 <a href="${env.CLIENT_URL}/evaluation/${internship.id}">Yakuniy bahoni ko'rish</a>`;
 

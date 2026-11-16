@@ -1,6 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth';
+import { buildAnalytics } from '../lib/stats';
+import { internshipScope } from './internships';
 
 const router = Router();
 
@@ -63,6 +65,22 @@ router.get('/stats', authenticate, async (req: AuthenticatedRequest, res: Respon
         totalApprovedHours: Number(totalHoursAggregate._sum.hours || 0),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/dashboard/analytics?weeks=8
+ * Role-scoped aggregates for charts (diary status, attendance, weekly dynamics, groups, companies)
+ */
+router.get('/analytics', authenticate, async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const user = req.user!;
+    const weeks = Math.min(26, Math.max(4, Number(req.query.weeks) || 8));
+    const isSupervisor = user.role === 'COMPANY_SUPERVISOR' || user.role === 'UNIVERSITY_SUPERVISOR';
+    const data = await buildAnalytics(internshipScope(user), isSupervisor, weeks);
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }

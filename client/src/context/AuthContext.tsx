@@ -12,6 +12,11 @@ export interface AuthUser {
   department?: string;
   group?: string;
   studentNumber?: string;
+  studyProgram?: string;
+  phone?: string | null;
+  position?: string | null;
+  mustChangePassword?: boolean;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -60,6 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { token, user: loggedInUser } = res.data.data;
         localStorage.setItem('auth_token', token);
         setUser(loggedInUser);
+        // Load the full profile (phone, study programme, etc.) in the background
+        void checkAuth();
         return { success: true };
       }
 

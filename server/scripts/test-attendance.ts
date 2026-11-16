@@ -116,7 +116,7 @@ async function runAttendanceIntegrationTests() {
     });
     const data3 = (await res3.json()) as any;
     assert(
-      res3.status === 403 && data3.error?.message?.includes('Universitet rahbari davomatni faqat kuzatishi mumkin'),
+      res3.status === 403 && data3.error?.message?.includes('muassasasi rahbari davomatni faqat kuzatishi mumkin'),
       'TEST 3: Universitet rahbari davomatni belgilashga uringanda 403 bilan to\'xtatiladi'
     );
 
@@ -277,7 +277,7 @@ async function runAttendanceIntegrationTests() {
     );
 
     // ── TEST 9: Status bo'yicha filter (GET /api/attendance?status=ABSENT) ──
-    const filterRes = await fetch(`${baseUrl}/attendance?month=2026-11&status=ABSENT`, {
+    const filterRes = await fetch(`${baseUrl}/attendance?month=2026-11&status=ABSENT&internshipId=${internship!.id}`, {
       headers: { Authorization: `Bearer ${supervisorToken}` },
     });
     const filterData = (await filterRes.json()) as any;

@@ -20,6 +20,7 @@ const createEntrySchema = z.object({
   result: z.string().optional(),
   hours: z.number().min(0.5, "Ish vaqti kamida 0.5 soat bo'lishi kerak").max(24, "Ish vaqti 24 soatdan oshmasligi kerak").default(8),
   status: z.enum(['DRAFT', 'SUBMITTED']).default('SUBMITTED'),
+  planItemId: z.string().optional().nullable(),
 });
 
 const updateEntrySchema = z.object({
@@ -29,7 +30,15 @@ const updateEntrySchema = z.object({
   result: z.string().optional(),
   hours: z.number().min(0.5).max(24).optional(),
   status: z.enum(['DRAFT', 'SUBMITTED']).optional(),
+  planItemId: z.string().optional().nullable(),
 });
+
+/** Ensures a plan item belongs to the given internship. */
+async function planItemBelongs(planItemId: string | null | undefined, internshipId: string): Promise<boolean> {
+  if (!planItemId) return true;
+  const item = await prisma.internshipPlanItem.findUnique({ where: { id: planItemId } });
+  return Boolean(item && item.internshipId === internshipId);
+}
 
 const reviewEntrySchema = z
   .object({
@@ -117,6 +126,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response, n
       take: takeLimit,
       orderBy: { entryDate: 'desc' },
       include: {
+        planItem: { select: { id: true, title: true } },
         internship: {
           include: {
             student: { select: { id: true, fullName: true, email: true } },
@@ -151,6 +161,8 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res: Response, n
         reviewedAt: latestReview?.createdAt ? latestReview.createdAt.toISOString() : null,
         reviewedBy: latestReview?.reviewer ? latestReview.reviewer.fullName : null,
         tasks: e.result ? [e.taskTitle, e.result] : [e.taskTitle],
+        planItemId: e.planItemId,
+        planItemTitle: e.planItem?.title ?? null,
         createdAt: e.createdAt.toISOString(),
       };
     });
@@ -173,6 +185,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
     const entry = await prisma.diaryEntry.findUnique({
       where: { id: req.params.id },
       include: {
+        planItem: { select: { id: true, title: true } },
         internship: {
           include: {
             student: { select: { id: true, fullName: true, email: true } },
@@ -246,6 +259,8 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
         reviewedAt: latestReview?.createdAt ? latestReview.createdAt.toISOString() : null,
         reviewedBy: latestReview?.reviewer ? latestReview.reviewer.fullName : null,
         tasks: entry.result ? [entry.taskTitle, entry.result] : [entry.taskTitle],
+        planItemId: entry.planItemId,
+        planItemTitle: entry.planItem?.title ?? null,
         createdAt: entry.createdAt.toISOString(),
       },
     });
@@ -259,12 +274,9 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
  */
 async function resolveInternshipForUser(user: any, requestedInternshipId?: string) {
   if (user.role === 'STUDENT') {
-    const studentInternship = await prisma.internship.findFirst({
-      where: {
-        studentId: user.id,
-        ...(requestedInternshipId ? { id: requestedInternshipId } : {}),
-      },
-    });
+    const studentInternship = requestedInternshipId
+      ? await prisma.internship.findFirst({ where: { studentId: user.id, id: requestedInternshipId } })
+      : null;
 
     if (studentInternship) {
       return { ok: true as const, internshipId: studentInternship.id, internship: studentInternship };
@@ -277,9 +289,9 @@ async function resolveInternshipForUser(user: any, requestedInternshipId?: strin
       }
     }
 
-    const anyStudentInternship = await prisma.internship.findFirst({
-      where: { studentId: user.id },
-    });
+    const anyStudentInternship =
+      (await prisma.internship.findFirst({ where: { studentId: user.id, status: 'ACTIVE' }, orderBy: { startDate: 'desc' } })) ??
+      (await prisma.internship.findFirst({ where: { studentId: user.id }, orderBy: { startDate: 'desc' } }));
 
     if (!anyStudentInternship) {
       return { ok: false as const, status: 404, message: "Sizga biriktirilgan faol amaliyot dasturi topilmadi" };
@@ -363,6 +375,11 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response, 
       return;
     }
 
+    if (!(await planItemBelongs(validated.planItemId, targetInternshipId))) {
+      res.status(400).json({ error: { message: "Tanlangan reja bandi ushbu amaliyotga tegishli emas", status: 400 } });
+      return;
+    }
+
     // Create fresh entry
     const entry = await prisma.diaryEntry.create({
       data: {
@@ -374,6 +391,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response, 
         hours: validated.hours,
         status: validated.status as DiaryEntryStatus,
         submittedAt: validated.status === 'SUBMITTED' ? new Date() : null,
+        planItemId: validated.planItemId || null,
       },
     });
 
@@ -479,6 +497,11 @@ router.patch('/:id', authenticate, async (req: AuthenticatedRequest, res: Respon
       }
     }
 
+    if (!(await planItemBelongs(validated.planItemId, existing.internshipId))) {
+      res.status(400).json({ error: { message: "Tanlangan reja bandi ushbu amaliyotga tegishli emas", status: 400 } });
+      return;
+    }
+
     const updated = await prisma.diaryEntry.update({
       where: { id },
       data: {
@@ -489,6 +512,7 @@ router.patch('/:id', authenticate, async (req: AuthenticatedRequest, res: Respon
         ...(validated.hours ? { hours: validated.hours } : {}),
         ...(validated.status ? { status: validated.status as DiaryEntryStatus } : {}),
         ...(validated.status === 'SUBMITTED' ? { submittedAt: new Date() } : {}),
+        ...(validated.planItemId !== undefined ? { planItemId: validated.planItemId || null } : {}),
       },
     });
 

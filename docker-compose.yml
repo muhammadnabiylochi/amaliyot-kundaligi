@@ -1,0 +1,44 @@
+# One-command deployment:
+#   1) copy .env.docker.example to .env and set the secrets
+#   2) docker compose up -d --build
+#   3) (optional demo data) docker compose exec app npm run prisma:seed
+#   Open http://localhost:3001
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amaliyot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-internship_diary}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-amaliyot} -d ${POSTGRES_DB:-internship_diary}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-amaliyot}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-internship_diary}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (min 16 chars)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CLIENT_URL: ${PUBLIC_URL:-http://localhost:3001}
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost:3001}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-amaliyot_kundaligibot}
+      REMINDER_HOUR: ${REMINDER_HOUR:-18}
+    ports:
+      - '${APP_PORT:-3001}:3001'
+    volumes:
+      - uploads:/app/server/uploads
+
+volumes:
+  pgdata:
+  uploads:

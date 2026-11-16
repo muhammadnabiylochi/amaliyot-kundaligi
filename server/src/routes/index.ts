@@ -10,6 +10,11 @@ import usersRouter from './users';
 import reportsRouter from './reports';
 import evaluationRouter from './evaluation';
 import telegramRouter from './telegram';
+import companiesRouter from './companies';
+import groupsRouter from './groups';
+import journalRouter from './journal';
+import notificationsRouter from './notifications';
+import finalReportRouter, { publicRouter } from './finalReport';
 
 const router = Router();
 
@@ -24,5 +29,11 @@ router.use('/internships', internshipsRouter);
 router.use('/users', usersRouter);
 router.use('/reports', reportsRouter);
 router.use('/telegram', telegramRouter);
+router.use('/companies', companiesRouter);
+router.use('/groups', groupsRouter);
+router.use('/journal', journalRouter);
+router.use('/notifications', notificationsRouter);
+router.use('/reports/final', finalReportRouter);
+router.use('/public', publicRouter);
 
 export default router;

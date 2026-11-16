@@ -1,3 +1,4 @@
+import { useConfirm } from '@/components/ui/extra';
 /**
  * AttachmentSection.tsx
  *
@@ -71,6 +72,7 @@ function validateFiles(files: File[]): string | null {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const AttachmentSection: React.FC<Props> = ({ entryId, entryStatus }) => {
+  const confirm = useConfirm();
   const [attachments, setAttachments] = useState<DiaryAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -132,7 +134,8 @@ export const AttachmentSection: React.FC<Props> = ({ entryId, entryStatus }) => 
   };
 
   const handleDelete = async (att: DiaryAttachment) => {
-    if (!window.confirm(`"${att.originalName}" faylini o'chirmoqchimisiz?`)) return;
+    const ok = await confirm({ title: "Faylni o'chirish", message: `"${att.originalName}" faylini o'chirmoqchimisiz?`, confirmLabel: "O'chirish", destructive: true });
+    if (!ok) return;
     setDeletingId(att.id);
     setError(null);
     try {
@@ -146,7 +149,7 @@ export const AttachmentSection: React.FC<Props> = ({ entryId, entryStatus }) => 
   };
 
   const handleDownload = (att: DiaryAttachment) => {
-    downloadAttachment(att.id, att.originalName);
+    downloadAttachment(att.id, att.originalName).catch((e) => setError(e?.message ?? 'Fayl yuklab olishda xato'));
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────

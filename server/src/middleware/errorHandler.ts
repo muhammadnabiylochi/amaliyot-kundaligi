@@ -26,7 +26,20 @@ export function errorHandler(
   else if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       statusCode = 400;
-      message = "Ushbu sana uchun allaqachon kundalik yozuvi mavjud. Bir kunga faqat bitta yozuv kiritish mumkin.";
+      const target = String((err.meta as any)?.target ?? '');
+      if (target.includes('entryDate')) {
+        message = "Ushbu sana uchun allaqachon kundalik yozuvi mavjud. Bir kunga faqat bitta yozuv kiritish mumkin.";
+      } else if (target.includes('attendanceDate')) {
+        message = "Ushbu sana uchun davomat allaqachon qayd etilgan.";
+      } else if (target.includes('email')) {
+        message = "Bu elektron pochta bilan foydalanuvchi allaqachon mavjud.";
+      } else if (target.includes('studentNumber')) {
+        message = "Bu talaba raqami (ID) allaqachon band.";
+      } else if (target.includes('name')) {
+        message = "Bu nom bilan yozuv allaqachon mavjud.";
+      } else {
+        message = "Bunday yozuv allaqachon mavjud (takrorlanish).";
+      }
     } else if (err.code === 'P2025') {
       statusCode = 404;
       message = "So'ralgan ma'lumot topilmadi.";

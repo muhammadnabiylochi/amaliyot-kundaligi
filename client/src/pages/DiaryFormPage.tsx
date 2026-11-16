@@ -17,12 +17,18 @@ import {
   saveDiaryEntry,
   fetchInternships,
   fetchDiaryEntryById,
+  fetchPlan,
   MockInternship,
 } from '@/lib/dataService';
+import type { PlanItem } from '@/lib/types';
+import { todayYmd } from '@/lib/types';
+import { Target } from 'lucide-react';
+import { useI18n } from '@/i18n';
 
 export default function DiaryFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [currentEntryId, setCurrentEntryId] = useState<string | undefined>(id);
   const isEditing = Boolean(id || currentEntryId);
 
@@ -30,13 +36,15 @@ export default function DiaryFormPage() {
     setCurrentEntryId(id);
   }, [id]);
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayYmd());
   const [internships, setInternships] = useState<MockInternship[]>([]);
   const [internshipId, setInternshipId] = useState('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [hours, setHours] = useState(8);
-  const [tasks, setTasks] = useState<string[]>(['Rejalashtirilgan amaliyot vazifasi']);
+  const [tasks, setTasks] = useState<string[]>([]);
+  const [plan, setPlan] = useState<PlanItem[]>([]);
+  const [planItemId, setPlanItemId] = useState<string>('');
   const [newTaskInput, setNewTaskInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -48,46 +56,64 @@ export default function DiaryFormPage() {
     let mounted = true;
 
     // Load available internships for current user
-    fetchInternships().then((data) => {
-      if (mounted) {
-        setInternships(data);
-        if (data.length > 0 && !internshipId) {
-          setInternshipId(data[0].id);
-        }
-      }
-    });
+    fetchInternships()
+      .then((data) => {
+        if (!mounted) return;
+        // Students write only into ACTIVE internships; prefer the active one by default
+        const usable = data.filter((i) => i.status === 'active');
+        setInternships(usable.length ? usable : data);
+        if (!id && (usable[0] || data[0])) setInternshipId((usable[0] || data[0]).id);
+      })
+      .catch((e) => mounted && setErrorMessage(e.message));
 
     // If editing existing entry, load entry data
     if (id) {
       fetchDiaryEntryById(id).then((entry) => {
+        if (mounted && !entry) {
+          setErrorMessage(t("Kundalik yozuvi topilmadi yoki uni ko'rish huquqingiz yo'q."));
+        }
         if (mounted && entry) {
+          setPlanItemId(entry.planItemId ?? '');
           setDate(entry.date);
           setInternshipId(entry.internshipId);
           setTitle(entry.title);
           setContent(entry.content);
           setHours(entry.hours);
-          if (entry.tasks && entry.tasks.length > 0) {
-            setTasks(entry.tasks);
-          }
+          // `result` is stored as "task1; task2" — the title is NOT part of it
+          setTasks(entry.result ? entry.result.split(';').map((x) => x.trim()).filter(Boolean) : []);
           if (entry.status === 'approved') {
             setIsEntryApproved(true);
             setEntryStatus('APPROVED');
-            setErrorMessage("Diqqat: Ushbu kundalik allaqachon tasdiqlangan (APPROVED). Uni o'zgartirish taqiqlanadi.");
+            setErrorMessage(t("Diqqat: Ushbu kundalik allaqachon tasdiqlangan (APPROVED). Uni o'zgartirish taqiqlanadi."));
           } else if (entry.status === 'returned') {
             setEntryStatus('RETURNED');
           } else if (entry.status === 'submitted') {
             setEntryStatus('SUBMITTED');
+            setErrorMessage(t("Bu yozuv rahbarga topshirilgan va ko'rib chiqilmoqda — hozircha uni tahrirlab bo'lmaydi."));
           } else {
             setEntryStatus('DRAFT');
           }
         }
-      });
+      }).catch((e) => mounted && setErrorMessage(e.message));
     }
 
     return () => {
       mounted = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!internshipId) return;
+    let mounted = true;
+    fetchPlan(internshipId)
+      .then((items) => mounted && setPlan(items))
+      .catch(() => mounted && setPlan([]));
+    return () => {
+      mounted = false;
+    };
+  }, [internshipId]);
+
+  const isLocked = isEntryApproved || entryStatus === 'SUBMITTED';
 
   const handleAddTask = () => {
     if (newTaskInput.trim()) {
@@ -104,16 +130,16 @@ export default function DiaryFormPage() {
     if (isSaving) return; // Prevent duplicate clicks
 
     if (isEntryApproved) {
-      setErrorMessage("Tasdiqlangan kundalikni qayta saqlash mumkin emas.");
+      setErrorMessage(t("Tasdiqlangan kundalikni qayta saqlash mumkin emas."));
       return;
     }
 
     if (!title.trim()) {
-      setErrorMessage("Iltimos, ish mavzusini kiriting.");
+      setErrorMessage(t("Iltimos, ish mavzusini kiriting."));
       return;
     }
     if (!content.trim()) {
-      setErrorMessage("Bajarilgan ishlarning tavsifini yozing.");
+      setErrorMessage(t("Bajarilgan ishlarning tavsifini yozing."));
       return;
     }
 
@@ -125,8 +151,9 @@ export default function DiaryFormPage() {
       entryDate: date,
       taskTitle: title.trim(),
       description: content.trim(),
-      result: tasks.length > 0 ? tasks.join('; ') : undefined,
+      result: tasks.length > 0 ? tasks.join('; ') : '',
       hours,
+      planItemId: planItemId || null,
       status: (actionType === 'save_draft' ? 'DRAFT' : 'SUBMITTED') as 'DRAFT' | 'SUBMITTED',
     };
 
@@ -144,18 +171,18 @@ export default function DiaryFormPage() {
           setCurrentEntryId(createdId);
           navigate(`/diary/edit/${createdId}`, { replace: true });
         }
-        setSaveSuccess("Qoralama muvaffaqiyatli saqlandi! Endi fayl biriktirishingiz yoki tahrirlashni davom ettirishingiz mumkin.");
+        setSaveSuccess(t("Qoralama muvaffaqiyatli saqlandi! Endi fayl biriktirishingiz yoki tahrirlashni davom ettirishingiz mumkin."));
         setTimeout(() => {
           setSaveSuccess(null);
         }, 4000);
       } else {
-        setSaveSuccess("Kundalik muvaffaqiyatli topshirildi va rahbar tekshiruviga yuborildi!");
+        setSaveSuccess(t("Kundalik muvaffaqiyatli topshirildi va rahbar tekshiruviga yuborildi!"));
         setTimeout(() => {
           navigate('/diary');
         }, 1200);
       }
     } else {
-      setErrorMessage(res.error || "Yozuvni saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+      setErrorMessage(res.error || t("Yozuvni saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring."));
     }
   };
 
@@ -171,10 +198,10 @@ export default function DiaryFormPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              {isEditing ? "Kundalik yozuvini tahrirlash" : "Yangi kundalik yozuvi yaratish"}
+              {isEditing ? t("Kundalik yozuvini tahrirlash") : t("Yangi kundalik yozuvi yaratish")}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Kunlik o'tilgan amaliyot va bajarilgan ishlar hisoboti
+              {t("Kunlik o'tilgan amaliyot va bajarilgan ishlar hisoboti")}
             </p>
           </div>
         </div>
@@ -183,7 +210,7 @@ export default function DiaryFormPage() {
       {saveSuccess && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2 text-xs font-medium animate-in fade-in">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{saveSuccess} Kundaliklar ro'yxatiga yo'naltirilmoqda...</span>
+          <span>{saveSuccess}</span>
         </div>
       )}
 
@@ -200,7 +227,7 @@ export default function DiaryFormPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Amaliyot dasturi <span className="text-rose-500">*</span>
+              {t("Amaliyot dasturi")} <span className="text-rose-500">*</span>
             </label>
             <select
               value={internshipId}
@@ -215,48 +242,71 @@ export default function DiaryFormPage() {
                   </option>
                 ))
               ) : (
-                <option value="">Faol amaliyot (Standart)</option>
+                <option value="">{t("Faol amaliyot (Standart)")}</option>
               )}
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Sana <span className="text-rose-500">*</span>
+              {t("Sana")} <span className="text-rose-500">*</span>
             </label>
             <Input
               type="date"
               value={date}
-              disabled={isEntryApproved}
+              disabled={isLocked}
               onChange={(e) => setDate(e.target.value)}
               icon={<Calendar className="h-4 w-4" />}
             />
           </div>
         </div>
 
+        {/* Plan item */}
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+            <Target className="inline h-3.5 w-3.5 mr-1 -mt-0.5 text-indigo-600" />
+            {t("Amaliyot rejasidagi mavzu")}
+          </label>
+          <select
+            value={planItemId}
+            disabled={isLocked}
+            onChange={(e) => setPlanItemId(e.target.value)}
+            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+          >
+            <option value="">{plan.length ? t("— Reja bandini tanlang (ixtiyoriy) —") : t("Rahbar hali reja kiritmagan")}</option>
+            {plan.map((p, i) => (
+              <option key={p.id} value={p.id}>
+                {i + 1}. {p.title} ({p.plannedHours} soat)
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-400 mt-1">{t("Tasdiqlangan soatlar shu reja bandining bajarilishiga qo'shiladi.")}</p>
+        </div>
+
         {/* Row 2: Title and Hours */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Mavzu yoki Asosiy faoliyat <span className="text-rose-500">*</span>
+              {t("Mavzu yoki Asosiy faoliyat")} <span className="text-rose-500">*</span>
             </label>
             <Input
               type="text"
-              disabled={isEntryApproved}
-              placeholder="Masalan: React komponentlarini refaktoring qilish"
+              disabled={isLocked}
+              placeholder={t("Masalan: React komponentlarini refaktoring qilish")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Ish vaqti (soat)
+              {t("Ish vaqti (soat)")}
             </label>
             <Input
               type="number"
-              min={1}
-              max={12}
-              disabled={isEntryApproved}
+              min={0.5}
+              max={24}
+              step={0.5}
+              disabled={isLocked}
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
               icon={<Clock className="h-4 w-4" />}
@@ -267,20 +317,20 @@ export default function DiaryFormPage() {
         {/* Tasks list */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-            Kun davomida bajarilgan alohida vazifalar ro'yxati
+            {t("Kun davomida bajarilgan alohida vazifalar ro'yxati")}
           </label>
-          {!isEntryApproved && (
+          {!isLocked && (
             <div className="flex gap-2 mb-2">
               <Input
                 type="text"
-                placeholder="Vazifa nomini yozing..."
+                placeholder={t("Vazifa nomini yozing...")}
                 value={newTaskInput}
                 onChange={(e) => setNewTaskInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
               />
               <Button type="button" variant="secondary" size="sm" onClick={handleAddTask} className="shrink-0">
                 <Plus className="h-4 w-4 mr-1" />
-                Qo'shish
+                {t("Qo'shish")}
               </Button>
             </div>
           )}
@@ -293,7 +343,7 @@ export default function DiaryFormPage() {
                     <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 shrink-0" />
                     {task}
                   </span>
-                  {!isEntryApproved && (
+                  {!isLocked && (
                     <button
                       type="button"
                       onClick={() => handleRemoveTask(index)}
@@ -306,21 +356,21 @@ export default function DiaryFormPage() {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-slate-400 italic">Vazifalar qo'shilmagan.</p>
+            <p className="text-xs text-slate-400 italic">{t("Vazifalar qo'shilmagan.")}</p>
           )}
         </div>
 
         {/* Content Details */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-            Bajarilgan ishlarning batafsil tavsifi <span className="text-rose-500">*</span>
+            {t("Bajarilgan ishlarning batafsil tavsifi")} <span className="text-rose-500">*</span>
           </label>
           <textarea
             rows={5}
-            disabled={isEntryApproved}
+            disabled={isLocked}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Bugungi amaliyot jarayonida qanday bilim va ko'nikmalarni qo'lladingiz, qanday muammolar paydo bo'ldi va ularni qanday bartaraf etdingiz..."
+            placeholder={t("Bugungi amaliyot jarayonida qanday bilim va ko'nikmalarni qo'lladingiz, qanday muammolar paydo bo'ldi va ularni qanday bartaraf etdingiz...")}
             className="w-full rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-800 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed disabled:bg-slate-100 disabled:cursor-not-allowed"
           />
         </div>
@@ -337,7 +387,7 @@ export default function DiaryFormPage() {
         <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
             <AlertCircle className="h-3.5 w-3.5 text-slate-400" />
-            <span>Yuborilgandan so'ng rahbar ko'rib chiqishi uchun taqdim etiladi.</span>
+            <span>{t("Yuborilgandan so'ng rahbar ko'rib chiqishi uchun taqdim etiladi.")}</span>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -345,24 +395,24 @@ export default function DiaryFormPage() {
               type="button"
               variant="outline"
               size="sm"
-              disabled={isSaving || isEntryApproved}
+              disabled={isSaving || isLocked}
               onClick={() => handleSubmit('save_draft')}
               isLoading={isSaving}
               className="flex-1 sm:flex-none gap-1.5"
             >
               <Save className="h-4 w-4" />
-              Qoralama saqlash
+              {t("Qoralama saqlash")}
             </Button>
             <Button
               type="button"
               size="sm"
-              disabled={isSaving || isEntryApproved}
+              disabled={isSaving || isLocked}
               onClick={() => handleSubmit('submit')}
               isLoading={isSaving}
               className="flex-1 sm:flex-none gap-1.5"
             >
               <Send className="h-4 w-4" />
-              Tasdiqlashga yuborish
+              {t("Tasdiqlashga yuborish")}
             </Button>
           </div>
         </div>

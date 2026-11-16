@@ -47,7 +47,7 @@ async function getAuthorizedInternshipIds(user: NonNullable<AuthenticatedRequest
 /**
  * GET /api/reports/summary (Existing dashboard summary report)
  */
-router.get('/summary', async (_req, res, next) => {
+router.get('/summary', authenticate, async (_req, res, next) => {
   try {
     const [studentsCount, companiesCount, approvedEntriesCount, totalHours] =
       await Promise.all([
@@ -782,8 +782,8 @@ router.get('/evaluation/:internshipId/excel', authenticate, async (req: Authenti
       'Maks. ball',
       'Korxona bali',
       'Korxona izohi',
-      'Universitet bali',
-      'Universitet izohi',
+      'Muassasa bali',
+      'Muassasa izohi',
     ];
     styleExcelHeader(ws, 7);
 
@@ -857,7 +857,7 @@ router.get('/evaluation/:internshipId/pdf', authenticate, async (req: Authentica
       { label: 'Guruh', value: internship.student.studentProfile?.group?.name || '—' },
       { label: 'Korxona', value: internship.company.name },
       { label: 'Korxona rahbari', value: internship.companySupervisor?.fullName || '—' },
-      { label: 'Universitet rahbari', value: internship.universitySupervisor?.fullName || '—' },
+      { label: "Ta'lim muassasasi rahbari", value: internship.universitySupervisor?.fullName || '—' },
       {
         label: 'Yakuniy natija',
         value: isBothSubmitted ? `${finalScore} / ${TOTAL_MAX_SCORE} ball (Tasdiqlangan)` : 'Baholash hali yakunlanmagan',
@@ -875,7 +875,7 @@ router.get('/evaluation/:internshipId/pdf', authenticate, async (req: Authentica
       doc.text('Mezon', colX[0] + 4, curY + 7, { width: colW[0] - 8 });
       doc.text('Maks', colX[1] + 4, curY + 7, { width: colW[1] - 8, align: 'center' });
       doc.text('Korxona', colX[2] + 4, curY + 7, { width: colW[2] - 8, align: 'center' });
-      doc.text('Universitet', colX[3] + 4, curY + 7, { width: colW[3] - 8, align: 'center' });
+      doc.text('Muassasa', colX[3] + 4, curY + 7, { width: colW[3] - 8, align: 'center' });
       doc.text('O‘rtacha', colX[4] + 4, curY + 7, { width: colW[4] - 8, align: 'center' });
       doc.text('Izohlar', colX[5] + 4, curY + 7, { width: colW[5] - 8 });
       return curY + 22;
@@ -886,7 +886,7 @@ router.get('/evaluation/:internshipId/pdf', authenticate, async (req: Authentica
     let isAlt = false;
     for (const b of breakdown) {
       doc.font(getFont(doc, false)).fontSize(8);
-      const commentsText = [b.companyComment ? `Korxona: ${b.companyComment}` : '', b.universityComment ? `Univ: ${b.universityComment}` : ''].filter(Boolean).join('\n') || '—';
+      const commentsText = [b.companyComment ? `Korxona: ${b.companyComment}` : '', b.universityComment ? `Muassasa: ${b.universityComment}` : ''].filter(Boolean).join('\n') || '—';
       const commHeight = doc.heightOfString(commentsText, { width: colW[5] - 8 });
       const nameHeight = doc.heightOfString(b.name, { width: colW[0] - 8 });
       const rowH = Math.max(22, commHeight + 10, nameHeight + 10);
@@ -928,7 +928,7 @@ router.get('/evaluation/:internshipId/pdf', authenticate, async (req: Authentica
     const uTotal = universityEval ? `${Number(universityEval.totalScore)} ball (${formatUzStatus(universityEval.status)})` : 'Kiritilmagan';
     const fTotal = isBothSubmitted ? `${finalScore} ball` : 'Kutilmoqda (Ikkala rahbar tasdiqlashi shart)';
 
-    doc.font(getFont(doc, false)).fontSize(8.5).text(`Korxona rahbari: ${cTotal}   |   Universitet rahbari: ${uTotal}`, 52, y + 24);
+    doc.font(getFont(doc, false)).fontSize(8.5).text(`Korxona rahbari: ${cTotal}   |   Ta'lim muassasasi rahbari: ${uTotal}`, 52, y + 24);
     doc.font(getFont(doc, true)).fontSize(9.5).fillColor(isBothSubmitted ? '#15803d' : '#b45309').text(`YAKUNIY O‘RTACHA NATIJA: ${fTotal}`, 52, y + 37);
 
     drawPdfFooter(doc);

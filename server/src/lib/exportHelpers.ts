@@ -5,23 +5,38 @@
 import fs from 'fs';
 import ExcelJS from 'exceljs';
 
-// Windows fonts with full Unicode support
-const FONT_REGULAR = 'C:/Windows/Fonts/arial.ttf';
-const FONT_BOLD = 'C:/Windows/Fonts/arialbd.ttf';
+// Unicode fonts (Uzbek latin o‘, g‘). First existing candidate wins: env override → Windows → Linux/Docker.
+function pickFont(candidates: (string | undefined)[]): string {
+  return candidates.find((p): p is string => Boolean(p) && fs.existsSync(p!)) ?? '';
+}
+const FONT_REGULAR = pickFont([
+  process.env.PDF_FONT_REGULAR,
+  'C:/Windows/Fonts/arial.ttf',
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+  '/usr/share/fonts/TTF/DejaVuSans.ttf',
+]);
+const FONT_BOLD = pickFont([
+  process.env.PDF_FONT_BOLD,
+  'C:/Windows/Fonts/arialbd.ttf',
+  '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+  '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+  '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+]);
 
 export function setupPdfFonts(doc: PDFKit.PDFDocument) {
-  if (fs.existsSync(FONT_REGULAR)) {
+  if (Boolean(FONT_REGULAR)) {
     doc.registerFont('CustomRegular', FONT_REGULAR);
     doc.font('CustomRegular');
   }
-  if (fs.existsSync(FONT_BOLD)) {
+  if (Boolean(FONT_BOLD)) {
     doc.registerFont('CustomBold', FONT_BOLD);
   }
 }
 
 export function getFont(_doc: PDFKit.PDFDocument, isBold = false) {
-  if (isBold && fs.existsSync(FONT_BOLD)) return 'CustomBold';
-  if (fs.existsSync(FONT_REGULAR)) return 'CustomRegular';
+  if (isBold && Boolean(FONT_BOLD)) return 'CustomBold';
+  if (Boolean(FONT_REGULAR)) return 'CustomRegular';
   return isBold ? 'Helvetica-Bold' : 'Helvetica';
 }
 
@@ -115,6 +130,10 @@ export function drawPdfFooter(doc: PDFKit.PDFDocument) {
   const pages = doc.bufferedPageRange();
   for (let i = 0; i < pages.count; i++) {
     doc.switchToPage(i);
+    // The footer sits inside the bottom margin; without zeroing it, pdfkit would
+    // treat the text as overflow and append an empty page for every footer.
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     const bottom = doc.page.height - 30;
     const width = doc.page.width - 80;
 
@@ -141,6 +160,7 @@ export function drawPdfFooter(doc: PDFKit.PDFDocument) {
         bottom,
         { width: width / 2, align: 'right' }
       );
+    doc.page.margins.bottom = savedBottom;
   }
 }
 

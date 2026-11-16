@@ -215,7 +215,7 @@ export function getTelegramBot(): Bot | null {
         const roleNames: Record<string, string> = {
           STUDENT: 'Talaba',
           COMPANY_SUPERVISOR: 'Korxona rahbari',
-          UNIVERSITY_SUPERVISOR: 'Universitet rahbari',
+          UNIVERSITY_SUPERVISOR: "Ta'lim muassasasi rahbari",
           ADMIN: 'Administrator',
         };
         const dateStr = account.linkedAt.toLocaleDateString('uz-UZ', {

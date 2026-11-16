@@ -8,6 +8,9 @@ import apiRouter from './routes/index';
 import { errorHandler } from './middleware/errorHandler';
 import { prisma } from './lib/prisma';
 import { startTelegramBot, stopTelegramBot } from './services/telegramBot';
+import { startReminderScheduler, stopReminderScheduler } from './services/reminderService';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
 
@@ -29,6 +32,15 @@ app.use(express.urlencoded({ extended: true }));
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', apiRouter);
 
+// ── Production: serve the built React client (single-container deploy) ───────
+const clientDist = process.env.CLIENT_DIST || path.resolve(__dirname, '../../client/dist');
+if (env.NODE_ENV === 'production' && fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist, { index: false, maxAge: '7d' }));
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
+
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: { message: 'Not Found', status: 404 } });
@@ -43,11 +55,13 @@ const server = app.listen(env.PORT, () => {
   console.log(`    Health check: http://localhost:${env.PORT}/api/health`);
   // Initialize Telegram bot if configured
   void startTelegramBot();
+  startReminderScheduler();
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 const shutdown = async (signal: string): Promise<void> => {
   console.log(`\n[${signal}] Shutting down gracefully…`);
+  stopReminderScheduler();
   await stopTelegramBot();
   server.close(async () => {
     await prisma.$disconnect();

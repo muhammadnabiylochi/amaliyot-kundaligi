@@ -120,6 +120,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response, next: Ne
           department: user.studentProfile?.group?.faculty || 'Boshqaruv',
           group: user.studentProfile?.group?.name,
           studentNumber: user.studentProfile?.studentNumber,
+          mustChangePassword: user.mustChangePassword,
         },
       },
     });
@@ -148,6 +149,9 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response,
         role: true,
         isActive: true,
         createdAt: true,
+        phone: true,
+        position: true,
+        mustChangePassword: true,
         studentProfile: {
           select: {
             studentNumber: true,
@@ -181,10 +185,74 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response,
         department: user.studentProfile?.group?.faculty || 'Boshqaruv',
         group: user.studentProfile?.group?.name,
         studentNumber: user.studentProfile?.studentNumber,
-        phone: user.studentProfile?.phone,
+        phone: user.studentProfile?.phone ?? user.phone,
+        position: user.position,
+        studyProgram: user.studentProfile?.group?.studyProgram,
+        mustChangePassword: user.mustChangePassword,
         createdAt: user.createdAt.toISOString(),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Joriy parolni kiriting'),
+    newPassword: z
+      .string()
+      .min(8, "Yangi parol kamida 8 belgidan iborat bo'lishi kerak")
+      .regex(/[A-Za-z]/, "Parolda kamida bitta harf bo'lishi kerak")
+      .regex(/[0-9]/, "Parolda kamida bitta raqam bo'lishi kerak"),
+  })
+  .refine((d) => d.currentPassword !== d.newPassword, {
+    message: "Yangi parol joriy paroldan farq qilishi kerak",
+    path: ['newPassword'],
+  });
+
+/**
+ * POST /api/auth/change-password
+ */
+router.post('/change-password', authenticate, loginLimiter, async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: parsed.error.errors[0]?.message || "Noto'g'ri ma'lumotlar", status: 400 } });
+      return;
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+      res.status(400).json({ error: { message: "Joriy parol noto'g'ri", status: 400 } });
+      return;
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await bcrypt.hash(parsed.data.newPassword, 10), mustChangePassword: false },
+    });
+    res.json({ success: true, message: "Parol muvaffaqiyatli o'zgartirildi" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const profileSchema = z.object({
+  phone: z.string().trim().max(30).optional().nullable(),
+});
+
+/**
+ * PATCH /api/auth/profile — user updates own phone number
+ */
+router.patch('/profile', authenticate, async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const d = profileSchema.parse(req.body);
+    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { studentProfile: true } });
+    if (me?.studentProfile) {
+      await prisma.studentProfile.update({ where: { userId: me.id }, data: { phone: d.phone || null } });
+    } else {
+      await prisma.user.update({ where: { id: req.user!.id }, data: { phone: d.phone || null } });
+    }
+    res.json({ success: true, message: 'Profil yangilandi' });
   } catch (error) {
     next(error);
   }

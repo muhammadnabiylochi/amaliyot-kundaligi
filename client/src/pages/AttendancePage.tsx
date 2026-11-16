@@ -22,7 +22,7 @@ import {
   recordAttendance,
   fetchInternships,
 } from '@/lib/dataService';
-import { MockInternship } from '@/data/mock';
+import { MockInternship } from '@/lib/types';
 import { Card, Button, Input } from '@/components/ui';
 import { AttendanceStatusBadge } from '@/components/ui/Badge';
 import { LoadingState, ErrorState } from '@/components/ui/FeedbackStates';
@@ -93,7 +93,7 @@ export default function AttendancePage(): JSX.Element {
   // Load internships list for supervisor / admin selection
   useEffect(() => {
     let mounted = true;
-    fetchInternships().then((data) => {
+    fetchInternships().catch(() => []).then((data) => {
       if (mounted) {
         setInternships(data);
         if (data.length > 0 && selectedInternshipId === 'all' && (user?.role === 'COMPANY_SUPERVISOR' || user?.role === 'STUDENT')) {
@@ -374,7 +374,7 @@ export default function AttendancePage(): JSX.Element {
           <span>
             {user?.role === 'STUDENT'
               ? "Siz o'z davomatingizni faol rejimda kuzatmoqdasiz. Davomat faqat korxona amaliyot rahbari tomonidan qayd etiladi."
-              : "Universitet rahbari sifatida talabalar davomatini kuzatish imkoniyatiga egasiz. Qayd etish amallari korxona rahbari tomonidan yuritiladi."}
+              : "Ta'lim muassasasi rahbari sifatida talabalar davomatini kuzatish imkoniyatiga egasiz. Qayd etish amallari korxona rahbari tomonidan yuritiladi."}
           </span>
         </div>
       )}

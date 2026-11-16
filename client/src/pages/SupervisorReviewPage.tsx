@@ -6,7 +6,7 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
-import { formatDate, MockDiaryEntry } from '@/data/mock';
+import { formatDate, MockDiaryEntry } from '@/lib/types';
 import { fetchDiaryEntries, submitDiaryReview } from '@/lib/dataService';
 import { Card, Button } from '@/components/ui';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -23,7 +23,13 @@ export default function SupervisorReviewPage() {
 
   // Load only SUBMITTED entries for supervisor review
   const loadReviewQueue = async () => {
-    const data = await fetchDiaryEntries({ status: 'submitted' });
+    let data: MockDiaryEntry[] = [];
+    try {
+      data = await fetchDiaryEntries({ status: 'submitted', limit: 100 });
+    } catch (e: any) {
+      setActionError(e.message);
+      return;
+    }
     // Filter strictly to submitted entries
     const submittedOnly = data.filter((e) => e.status === 'submitted');
     setEntries(submittedOnly);
@@ -52,7 +58,8 @@ export default function SupervisorReviewPage() {
     setActionError(null);
 
     const res = await submitDiaryReview(selectedEntry.id, {
-      decision: newStatus,
+      // The API accepts 'approved' | 'returned' (a returned entry goes back to the student for fixes)
+      decision: newStatus === 'rejected' ? 'returned' : 'approved',
       comment: comment || (newStatus === 'approved' ? "Tasdiqlandi" : "Qayta ishlash talab qilinadi"),
     });
 

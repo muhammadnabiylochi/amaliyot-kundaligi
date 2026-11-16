@@ -1,233 +1,105 @@
-# Internship Diary — Elektron Amaliyot Kundaligi
+# Elektron Amaliyot Kundaligi
 
-A production-minded web application for managing and monitoring university students' internships.
+**Mavzu:** Professional ta'lim uchun elektron kundalik va amaliyot jurnalini yaratish.
 
-## Tech Stack
+Kollej va texnikum talabalarining ishlab chiqarish amaliyotini boshqaradigan veb-ilova: kundalik yuritish, davomat, amaliyot rejasi, rahbar tekshiruvi, yakuniy baholash, guruh jurnali, hisobotlar (PDF/Excel) va Telegram bildirishnomalari.
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18, TypeScript, Vite 5 |
-| UI | Tailwind CSS v3, shadcn/ui, Lucide icons |
-| Routing | React Router v6 |
-| Backend | Node.js, Express 4, TypeScript |
-| Database | PostgreSQL 15+ |
-| ORM | Prisma 5 |
-| Validation | Zod |
-| Bot (later) | grammY |
+## Rollar
 
-## Project Structure
+| Rol | Imkoniyatlar |
+|---|---|
+| **Administrator** (amaliyot bo'limi) | Foydalanuvchilar (yaratish, tahrirlash, parol tiklash, Excel import), korxonalar va guruhlar, amaliyotlarni biriktirish, barcha hisobotlar |
+| **Korxona rahbari** | Amaliyot rejasini tuzish, kundaliklarni tasdiqlash/qaytarish, davomatni belgilash, yakuniy baholash, talabani eslatish |
+| **Ta'lim muassasasi rahbari** (ishlab chiqarish ta'limi ustasi) | Kuzatish, kundaliklarni tasdiqlash, reja, yakuniy baholash, guruh jurnali |
+| **Talaba** | Kundalik yozish (reja bandiga bog'lab), fayl biriktirish, o'z amaliyoti, davomat va baholarini ko'rish, yakuniy hisobotni yuklab olish |
 
-```
-internship-diary/
-├── client/               # React + Vite frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Route pages
-│   │   ├── lib/          # Utilities / API client
-│   │   └── main.tsx
-│   ├── index.html
-│   ├── vite.config.ts
-│   └── package.json
-├── server/               # Express API
-│   ├── src/
-│   │   ├── routes/       # Express routers
-│   │   ├── middleware/   # Custom middleware
-│   │   └── index.ts      # App entry point
-│   ├── prisma/
-│   │   └── schema.prisma
-│   └── package.json
-├── .gitignore
-└── README.md
-```
+## Asosiy imkoniyatlar
 
-## Prerequisites
+- **Elektron kundalik**: qoralama → topshirilgan → tasdiqlangan / qaytarilgan; dalil fayllari (PDF, rasm, DOCX, XLSX).
+- **Amaliyot rejasi (dasturi)**: mavzular va soatlar; kundalik reja bandiga bog'lanadi, bajarilish foizi avtomatik hisoblanadi.
+- **Davomat kalendari** va **guruh jurnali**: talaba × kun jadvali (davomat + kundalik holati), Excel eksport.
+- **Yakuniy baholash**: 5 mezon (100 ball), korxona va muassasa rahbari alohida baholaydi, o'rtacha ball avtomatik.
+- **Yakuniy rasmiy hujjat (PDF)**: reja bajarilishi, kundaliklar, davomat, baholash, imzo joylari va **QR-kod**. QR ochiq `/verify/...` sahifasiga olib boradi; havola HMAC bilan imzolangan, soxtalashtirib bo'lmaydi.
+- **Grafiklar**: haftalik dinamika, kundalik holati, davomat taqsimoti, guruh va korxona kesimidagi ko'rsatkichlar.
+- **Bildirishnomalar**: sarlavhadagi qo'ng'iroqcha (tekshirish kutilmoqda, qaytarilgan kundalik, yozilmagan kunlar, baholash muddati).
+- **Telegram bot**: hodisalar bo'yicha xabarlar; har kuni soat 18:00 (Toshkent) da kundalik yozmagan talabalarga avtomatik **eslatma**, rahbar uchun qo'lda «Eslatish» tugmasi.
+- **Excel import**: talabalar va rahbarlarni shablon orqali ommaviy qo'shish (vaqtinchalik parollar CSV sifatida yuklab olinadi).
+- **Xavfsizlik**: bcrypt, JWT + HttpOnly cookie, rollar bo'yicha ruxsat (RBAC), login urinishlarini cheklash, birinchi kirishda parolni almashtirish talabi.
+- **O'zbek / rus tili**, **mobil moslashuv** va **PWA**: telefonga ilova sifatida o'rnatiladi.
 
-- **Node.js v20 LTS** — https://nodejs.org/en/download  
-  *(Download the Windows Installer, run it, then restart your terminal)*
-- **PostgreSQL 15+** — https://www.postgresql.org/download/windows/
-- **Git** (already installed)
+## Texnologiyalar
 
-## Quick Start
+React 18 + TypeScript + Vite + Tailwind CSS + Recharts · Node.js 20 + Express + Prisma 5 + PostgreSQL 16 · pdfkit, exceljs, qrcode · grammY (Telegram).
 
-### 1. Clone / open the project
+## Lokal ishga tushirish
 
-```powershell
-cd <project-directory> # masalan: cd path/to/internship-diary
-```
+Talablar: Node.js 20+, PostgreSQL 15+.
 
-### 2. Configure environment variables
-
-> [!CAUTION]
-> **Security Note:** Never commit `.env` files to Git or any version control system! `.env` files contain sensitive secrets, database credentials, JWT secrets, and Telegram bot tokens. Ensure `.env` and `server/.env` are always excluded via `.gitignore` and only `.env.example` templates with generic placeholders are tracked.
-
-```powershell
-# Server
-copy server\.env.example server\.env
-# Client
-copy client\.env.example client\.env
-```
-
-Edit `server\.env` and fill in your PostgreSQL credentials:
-
-```
-DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/internship_diary"
-PORT=3001
-NODE_ENV=development
-```
-
-### 3. Set up the database
-
-Make sure PostgreSQL is running and the database exists (e.g. `CREATE DATABASE internship_diary;` in psql/pgAdmin).
-
-```powershell
+```bash
+# 1. Server
 cd server
+cp .env.example .env          # DATABASE_URL, JWT_SECRET va boshqalarni yozing
 npm install
-
-# Apply database migration (never use reset or delete)
 npx prisma migrate deploy
-# Or for interactive development migration:
-# npx prisma migrate dev
+npm run prisma:seed           # demo ma'lumotlar (ixtiyoriy)
+npm run dev                   # http://localhost:3001
 
-# Generate Prisma Client
-npx prisma generate
-
-# (Optional) Seed development data (fictional accounts and sample diary entries)
-npm run prisma:seed
-```
-
-### 4. Start the backend
-
-```powershell
-# Inside server/
-npm run dev
-# → http://localhost:3001
-# → http://localhost:3001/api/health
-```
-
-### 5. Start the frontend
-
-```powershell
-# In a new terminal, inside client/
-cd ..\client
+# 2. Client (yangi terminalda)
+cd client
 npm install
-npm run dev
-# → http://localhost:5173
+npm run dev                   # http://localhost:5173
 ```
 
-## Available Scripts
+Demo akkauntlar (parol `DevPassword123!`):
 
-### Server (`server/`)
+| Rol | Email |
+|---|---|
+| Administrator | `admin@edu.uz` |
+| Korxona rahbari | `sherzod.nazarov@uzcard.uz` |
+| Ta'lim muassasasi rahbari | `dilshod.toshmatov@edu.uz` |
+| Talaba | `jasur.aliev@student.edu.uz` |
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server with ts-node-dev (hot reload) |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run compiled production build |
-| `npm run typecheck` | Run `tsc --noEmit` |
-| `npm run lint` | ESLint check |
+Demo profillar kirish sahifasida faqat dev rejimida (yoki `VITE_DEMO_MODE=true` bo'lganda) ko'rinadi.
 
-### Client (`client/`)
+## Docker bilan (bitta buyruq)
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview production build |
-| `npm run typecheck` | Run `tsc --noEmit` |
-| `npm run lint` | ESLint check |
-
-## Environment Variables
-
-See `server/.env.example` and `client/.env.example` for all required variables.
-
-## Shadcn/ui Components
-
-After running `npm install` in `client/`, add components with:
-
-```powershell
-npx shadcn@latest add button
-npx shadcn@latest add card
-# etc.
+```bash
+cp .env.docker.example .env        # parollar va JWT_SECRET ni o'zgartiring
+docker compose up -d --build       # http://localhost:3001
+docker compose exec app npm run prisma:seed   # ixtiyoriy demo ma'lumotlar
 ```
 
-## API Documentation
+Production rejimda server React ilovasini ham o'zi tarqatadi (bitta konteyner, bitta port). PDF'dagi QR-kod to'g'ri ishlashi uchun `PUBLIC_URL` ga saytning haqiqiy manzilini yozing.
 
-### Fayl biriktirish (Diary Attachments API)
+## Testlar
 
-| Metod | Endpoint | Ruxsat (Rollar) | Tavsif |
-|-------|----------|-----------------|--------|
-| `POST` | `/api/diary/:entryId/attachments` | Talaba (kundalik egasi) | Kundalikka bir yoki bir nechta fayl yuklash (multipart/form-data, max 10MB, PDF/JPG/PNG/DOCX/XLSX). Faqat `DRAFT` va `RETURNED` holatda ruxsat beriladi. |
-| `GET` | `/api/diary/:entryId/attachments` | Talaba, Korxona rahbari, Universitet rahbari, Admin | Kundalikka biriktirilgan fayllar ro'yxatini olish. |
-| `GET` | `/api/diary/attachments/:attachmentId` | Talaba, Korxona rahbari, Universitet rahbari, Admin | Faylni stream orqali xavfsiz yuklab olish. To'g'ridan-to'g'ri ochiq statik havola yo'q. |
-| `DELETE` | `/api/diary/attachments/:attachmentId` | Talaba (kundalik egasi), Admin | Biriktirilgan faylni o'chirish. Faqat `DRAFT` va `RETURNED` holatdagi kundaliklar uchun ruxsat etiladi. |
-
-### Hisobotlarni eksport qilish (Reports Export API)
-
-| Metod | Endpoint | Ruxsat | Format | Tavsif |
-|-------|----------|--------|--------|--------|
-| `GET` | `/api/reports/diary/pdf` | Talaba, Rahbar, Admin | PDF | Kundalik hisobotini A4 PDF formatda eksport qilish (status, sana, filtrlar bilan) |
-| `GET` | `/api/reports/diary/excel` | Talaba, Rahbar, Admin | Excel (.xlsx) | Kundalik hisobotini Excel formatda eksport qilish (summa formulalari va sarlavhalar bilan) |
-| `GET` | `/api/reports/attendance/pdf` | Talaba, Rahbar, Admin | PDF | Davomat kalendari va statistikasi (kelgan, kechikkan, foiz) PDF hisoboti |
-| `GET` | `/api/reports/attendance/excel` | Talaba, Rahbar, Admin | Excel (.xlsx) | Davomat jadvallari va KPI ko'rsatkichlari Excel hisoboti |
-| `GET` | `/api/reports/evaluation/:internshipId/pdf` | Talaba, Rahbar, Admin | PDF | Yakuniy baholash (5 ta mezon, rahbarlar ballari, o'rtacha ball) rasmiy PDF hisoboti |
-| `GET` | `/api/reports/evaluation/:internshipId/excel` | Talaba, Rahbar, Admin | Excel (.xlsx) | Yakuniy baholash tafsilotlari Excel jadvali |
-
-#### Xavfsizlik choralari:
-- **Magic Bytes Signature Tekshiruvi:** Fayl faqat kengaytmasi bo'yicha emas, balki haqiqiy baytlari (magic numbers) bo'yicha tekshiriladi (PDF `%PDF`, PNG `\x89PNG`, JPG `\xFF\xD8\xFF`, DOCX/XLSX `PK\x03\x04`).
-- **Path Traversal himoyasi:** Har bir fayl UUID asosidagi tasodifiy nom bilan server papkasiga saqlanadi.
-- **Ruxsatsiz kirishdan himoya:** Barcha fayllarga kirish `Bearer` token orqali tekshiriladi va begona foydalanuvchilar (boshqa talabalar) `403 Forbidden` oladi.
-- **Graceful Error Handling:** Fayl ma'lumotlar bazasida mavjud bo'lib, diskda yo'q bo'lsa server yiqilmaydi va tushunarli `410 Gone` xatosi qaytariladi.
-- **O'zbek lotin shriftlari:** PDF hisobotlarida to'liq Unicode va O'zbek lotin harflari (`o‘`, `g‘`, `sh`, `ch`) to'g'ri chop etilishi ta'minlangan.
-
-## Key Modules Implemented
-
-- ✅ **Authentication & RBAC:** JWT, Cookie, Admin / Student / Company Supervisor / University Supervisor rollari.
-- ✅ **Elektron Kundalik (Diary):** DRAFT, SUBMITTED, RETURNED, APPROVED davriy holatlar boshqaruvi.
-- ✅ **Davomat Kalendari (Attendance):** Oylik kalendar, holatlar (PRESENT, ABSENT, LATE, EXCUSED), ishlangan soatlar va statistika.
-- ✅ **Yakuniy Baholash (Evaluation):** 5 ta mezon (100 ball), korxona va universitet rahbarlari alohida baholashi, o'rtacha ball avto-hisobi.
-- ✅ **Fayl biriktirish (Attachments):** Kundalikka dalil fayllari biriktirish, ko'rish, yuklab olish va xavfsiz o'chirish.
-- ✅ **Hisobotlarni Eksport qilish (Reports Export):** Kundalik, davomat va yakuniy baholash bo'yicha professional PDF va Excel eksportlari.
-- ✅ **Telegram Bot Integratsiyasi (@amaliyot_kundaligibot):** Profil orqali xavfsiz 1 martalik kod bilan bog'lash, buyruqlar (`/start`, `/status`, `/unlink`, `/help`), kundalik topshirish/qaytarish/tasdiqlash, davomat va yakuniy baholash bo'yicha tezkor bildirishnomalar, idempotent yuborish.
-
----
-
-### Telegram Bot Integratsiyasi (@amaliyot_kundaligibot)
-
-Tizimga rasmiy [@amaliyot_kundaligibot](https://t.me/amaliyot_kundaligibot) boti to'liq integratsiya qilingan.
-
-#### Sozlamalar (`server/.env`):
-```env
-# Telegram Bot
-TELEGRAM_BOT_TOKEN="BU_YERGA_YANGILANGAN_BOT_TOKENINI_KIRITAMAN"
-TELEGRAM_BOT_USERNAME="amaliyot_kundaligibot"
-CLIENT_URL="http://localhost:5173"
+```bash
+cd server
+npm run prisma:seed
+npm test          # barcha integratsion testlar (auth, kundalik, davomat, fayllar, baholash, hisobotlar, xavfsizlik, yangi funksiyalar)
 ```
 
-#### Bot Buyruqlari:
-- `/start` — Botni ishga tushirish, xush kelibsiz xabari va deep-link orqali bog'lash (`/start <code>`).
-- `/status` — Foydalanuvchi hisobi bog'langanligi, ism-sharif, rol va bog'langan vaqtni ko'rsatish.
-- `/unlink` — Telegram akkauntini web-ilovadagi profildan xavfsiz uzish.
-- `/help` — Buyruqlar ro'yxati va yo'riqnoma.
+## Yangi API endpointlari
 
-#### REST API Endpointlari:
 | Metod | Endpoint | Ruxsat | Tavsif |
-|-------|----------|--------|--------|
-| `GET` | `/api/telegram/status` | Autentifikatsiyadan o'tgan foydalanuvchi | Foydalanuvchining Telegram ulanish holatini qaytaradi. |
-| `POST` | `/api/telegram/generate-link-code` | Autentifikatsiyadan o'tgan foydalanuvchi | 10 daqiqa amal qiluvchi 6 xonali bir martalik kod yaratadi (SHA-256 xeshlanadi). |
-| `POST` | `/api/telegram/unlink` | Autentifikatsiyadan o'tgan foydalanuvchi | Telegram akkauntini foydalanuvchi hisobidan uzadi. |
+|---|---|---|---|
+| GET/POST/PATCH/DELETE | `/api/companies` | Admin (o'qish — rahbarlar ham) | Korxonalar |
+| GET/POST/PATCH/DELETE | `/api/groups` | Admin (o'qish — rahbarlar ham) | O'quv guruhlari |
+| POST/PATCH/DELETE | `/api/internships/:id?` | Admin | Amaliyot yaratish / tahrirlash / bo'sh amaliyotni o'chirish |
+| GET | `/api/internships/mine` | Hamma | Talabaning faol amaliyoti |
+| GET/POST/PATCH/DELETE | `/api/internships/:id/plan[/:itemId]` | Admin, biriktirilgan rahbar | Amaliyot rejasi |
+| PATCH | `/api/users/:id` | Admin | Foydalanuvchini tahrirlash |
+| POST | `/api/users/:id/reset-password` | Admin | Vaqtinchalik parol berish |
+| GET / POST | `/api/users/import/template`, `/api/users/import` | Admin | Excel shablon va import |
+| POST | `/api/auth/change-password` | Hamma | Parolni almashtirish |
+| PATCH | `/api/auth/profile` | Hamma | O'z telefon raqamini yangilash |
+| GET | `/api/dashboard/analytics?weeks=8` | Hamma (rol bo'yicha) | Grafiklar uchun statistika |
+| GET | `/api/journal?month=YYYY-MM&groupId=`, `/api/journal/excel` | Rahbarlar, Admin | Guruh jurnali |
+| GET | `/api/reports/final/:internshipId/pdf` | Talaba (o'zi), rahbar, Admin | Yakuniy hisobot + QR |
+| GET | `/api/public/verify/:internshipId?c=` | Ochiq | QR orqali hujjatni tekshirish |
+| GET | `/api/notifications` | Hamma | Bildirishnomalar |
+| POST | `/api/notifications/remind/:internshipId` | Rahbarlar, Admin | Telegram eslatma yuborish |
 
-#### Avtomatik Bildirishnomalar:
-1. **Kundalik topshirilganda (`SUBMITTED`):** Talabaga topshirilgani haqida xabar, biriktirilgan korxona va universitet rahbarlariga ko'rib chiqish havolasi bilan xabar.
-2. **Kundalik qaytarilganda (`RETURNED`):** Talabaga kamchiliklar va rahbarning izohi bilan xabar.
-3. **Kundalik tasdiqlanganda (`APPROVED`):** Talabaga muvaffaqiyatli tasdiqlangani haqida xabar.
-4. **Davomat qayd etilganda (`ATTENDANCE_RECORDED`):** Talabaga sana, holat (Kelgan, Kechikkan, Uzrli) va ishlangan soat haqida xabar.
-5. **Yakuniy baholash yakunlanganda (`EVALUATION_COMPLETED`):** Har ikki rahbar bahosi topshirilgach, talabaga yakuniy ball haqida xabar.
-6. **Idempotency & Ishonchlilik:** Har bir xabar `NotificationLog` orqali tekshiriladi, dublikatlar qayta yuborilmaydi; Telegram API yoki tarmoq xatolari asosiy HTTP operatsiyalarini to'xtatmaydi.
+## Xavfsizlik eslatmasi
 
----
-
-## Security
-
-- **Environment Secrets:** Never commit `.env` files. The repository `.gitignore` explicitly ignores `.env`, `server/.env`, and related local environment configurations.
-- **Access Tokens & Credentials:** Database credentials, JWT secrets, and Telegram bot tokens must remain in untracked `.env` files only. Never push them to version control. Always maintain `.env.example` templates with generic placeholders.
-
+`.env` fayllarida parollar va bot tokeni bo'ladi — ularni hech qachon arxivga yoki gitga qo'shmang. Tarqatish uchun faqat `.env.example` fayllaridan foydalaning.

@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useI18n } from '@/i18n';
+import { Field, useConfirm, useToast } from '@/components/ui/extra';
+import { ROLE_LABELS } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import {
   fetchTelegramStatus,
@@ -6,6 +9,8 @@ import {
   unlinkTelegram,
   TelegramStatusResponse,
   TelegramLinkCodeResponse,
+  changePassword,
+  updateOwnProfile,
 } from '@/lib/dataService';
 import {
   User,
@@ -20,11 +25,56 @@ import {
   Clock,
   ShieldCheck,
   BellRing,
+  KeyRound,
+  Settings,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input } from '@/components/ui';
 
 export default function ProfilePage(): JSX.Element {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
+  const { t, lang, setLang } = useI18n();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [pw, setPw] = useState({ current: '', next: '', repeat: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+
+  useEffect(() => {
+    setPhone(user?.phone ?? '');
+  }, [user?.phone]);
+
+  useEffect(() => {
+    if (window.location.hash === '#password') {
+      setTimeout(() => document.getElementById('password')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+    }
+  }, []);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw.next !== pw.repeat) return;
+    setPwSaving(true);
+    const r = await changePassword(pw.current, pw.next);
+    setPwSaving(false);
+    if (r.ok) {
+      toast(t("Parol muvaffaqiyatli o'zgartirildi"));
+      setPw({ current: '', next: '', repeat: '' });
+      await checkAuth();
+    } else {
+      toast(r.error || t('Xatolik'), 'error');
+    }
+  };
+
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhoneSaving(true);
+    const r = await updateOwnProfile({ phone: phone.trim() || null });
+    setPhoneSaving(false);
+    if (r.ok) {
+      toast(t('Profil yangilandi'));
+      await checkAuth();
+    } else toast(r.error || t('Xatolik'), 'error');
+  };
   const [tgStatus, setTgStatus] = useState<TelegramStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -97,9 +147,13 @@ export default function ProfilePage(): JSX.Element {
   };
 
   const handleUnlink = async () => {
-    if (!window.confirm("Rostdan ham Telegram akkauntingizni ushbu hisobdan uzmoqchimisiz?")) {
-      return;
-    }
+    const ok = await confirm({
+      title: t('Telegramni uzish'),
+      message: t('Rostdan ham Telegram akkauntingizni ushbu hisobdan uzmoqchimisiz?'),
+      confirmLabel: t('Uzish'),
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       setActionLoading(true);
       setError(null);
@@ -119,18 +173,13 @@ export default function ProfilePage(): JSX.Element {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const roleNames: Record<string, string> = {
-    STUDENT: 'Talaba',
-    COMPANY_SUPERVISOR: 'Korxona rahbari',
-    UNIVERSITY_SUPERVISOR: 'Universitet rahbari',
-    ADMIN: 'Administrator',
-  };
+  const roleNames: Record<string, string> = Object.fromEntries(Object.entries(ROLE_LABELS).map(([k, v]) => [k, t(v)]));
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Foydalanuvchi profili va sozlamalar</h1>
-        <p className="text-sm text-slate-500 mt-1">Shaxsiy ma'lumotlar va Telegram bildirishnomalar boti integratsiyasi</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t('Foydalanuvchi profili va sozlamalar')}</h1>
+        <p className="text-sm text-slate-500 mt-1">{t("Shaxsiy ma'lumotlar, xavfsizlik va Telegram bildirishnomalari")}</p>
       </div>
 
       {error && (
@@ -177,14 +226,116 @@ export default function ProfilePage(): JSX.Element {
               </span>
             </div>
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-              <span className="text-xs text-slate-500 block mb-1">Xavfsizlik holati</span>
-              <span className="text-sm font-semibold text-emerald-700 flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4" /> Faol va tasdiqlangan
-              </span>
+              <span className="text-xs text-slate-500 block mb-1">{t('Xavfsizlik holati')}</span>
+              {user?.mustChangePassword ? (
+                <span className="text-sm font-semibold text-amber-700 flex items-center gap-1.5">
+                  <KeyRound className="h-4 w-4" /> {t('Vaqtinchalik parol — almashtiring')}
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-emerald-700 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4" /> {t('Faol va himoyalangan')}
+                </span>
+              )}
             </div>
+            {user?.group && (
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs text-slate-500 block mb-1">{t('Guruh va mutaxassislik')}</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  {user.group}
+                  {user.studyProgram ? ` — ${user.studyProgram}` : ''}
+                </span>
+              </div>
+            )}
+            {user?.studentNumber && (
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs text-slate-500 block mb-1">{t('Talaba ID')}</span>
+                <span className="text-sm font-semibold text-slate-900">{user.studentNumber}</span>
+              </div>
+            )}
+            {user?.position && (
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs text-slate-500 block mb-1">{t('Lavozim')}</span>
+                <span className="text-sm font-semibold text-slate-900">{user.position}</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
+
+
+      {/* Account settings: password, phone, language */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card id="password" className={user?.mustChangePassword ? 'border-amber-300 ring-2 ring-amber-100' : ''}>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>{t("Parolni o'zgartirish")}</CardTitle>
+                <CardDescription>
+                  {user?.mustChangePassword ? t('Siz vaqtinchalik parol bilan kirgansiz — yangisini o‘rnating') : t('Kamida 8 belgi, harf va raqam')}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <Field label={t('Joriy parol')} required>
+                <Input type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
+              </Field>
+              <Field label={t('Yangi parol')} required>
+                <Input type="password" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
+              </Field>
+              <Field label={t('Yangi parolni takrorlang')} required error={pw.repeat && pw.repeat !== pw.next ? t('Parollar mos emas') : undefined}>
+                <Input type="password" autoComplete="new-password" value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} />
+              </Field>
+              <Button type="submit" size="sm" isLoading={pwSaving} disabled={!pw.current || pw.next.length < 8 || pw.next !== pw.repeat}>
+                {t('Parolni saqlash')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-700">
+                <Settings className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle>{t('Sozlamalar')}</CardTitle>
+                <CardDescription>{t('Aloqa telefoni va interfeys tili')}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <form onSubmit={handleSavePhone} className="flex items-end gap-2">
+              <Field label={t('Telefon raqami')} className="flex-1">
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 000-00-00" />
+              </Field>
+              <Button type="submit" size="sm" variant="outline" isLoading={phoneSaving}>
+                {t('Saqlash')}
+              </Button>
+            </form>
+            <div>
+              <span className="block text-xs font-semibold text-slate-700 mb-1.5">{t('Interfeys tili')}</span>
+              <div className="inline-flex p-1 rounded-lg bg-slate-100 gap-1">
+                {(['uz', 'ru'] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLang(l)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold ${lang === l ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-600'}`}
+                  >
+                    {l === 'uz' ? "O'zbekcha" : 'Русский'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Telegram Bot Integration Card */}
       <Card className="border-indigo-100 shadow-sm">
@@ -208,7 +359,7 @@ export default function ProfilePage(): JSX.Element {
                   )}
                 </div>
                 <CardDescription className="text-slate-500 mt-0.5">
-                  Rasmiy bot: <a href="https://t.me/amaliyot_kundaligibot" target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a>
+                  Rasmiy bot: <a href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a>
                 </CardDescription>
               </div>
             </div>
@@ -254,7 +405,7 @@ export default function ProfilePage(): JSX.Element {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href="https://t.me/amaliyot_kundaligibot"
+                    href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-[#229ED9] hover:bg-[#1e8bc0] transition-colors shadow-xs"
@@ -366,7 +517,7 @@ export default function ProfilePage(): JSX.Element {
                       <div className="p-3.5 rounded-xl bg-white/80 border border-indigo-100 text-xs text-slate-600 space-y-1.5">
                         <p className="font-semibold text-slate-800">Qadamlar:</p>
                         <ol className="list-decimal list-inside space-y-1 pl-1">
-                          <li>Telegram'da <a href="https://t.me/amaliyot_kundaligibot" target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a> botini oching.</li>
+                          <li>Telegram'da <a href={tgStatus?.botUrl ?? "https://t.me/amaliyot_kundaligibot"} target="_blank" rel="noreferrer" className="text-[#229ED9] font-medium hover:underline">@amaliyot_kundaligibot</a> botini oching.</li>
                           <li>Botga <code className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-bold font-mono">/start</code> buyrug'ini yuboring.</li>
                           <li>Yuqoridagi 6 xonali kodni (<span className="font-mono font-bold text-indigo-900">{linkData.code}</span>) botga xabar sifatida yuboring.</li>
                           <li>Muvaffaqiyatli javob olgach, bu yerdagi "Yangilash" tugmasini bosing!</li>

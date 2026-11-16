@@ -214,7 +214,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response, 
 
     if (user.role === 'UNIVERSITY_SUPERVISOR') {
       res.status(403).json({
-        error: { message: "Universitet rahbari davomatni faqat kuzatishi mumkin, qayd etish korxona rahbari tomonidan bajariladi.", status: 403 },
+        error: { message: "Ta'lim muassasasi rahbari davomatni faqat kuzatishi mumkin, qayd etish korxona rahbari tomonidan bajariladi.", status: 403 },
       });
       return;
     }

@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/types';
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -364,7 +365,7 @@ export default function EvaluationDetailPage(): JSX.Element {
               <div className="flex items-start gap-2">
                 <GraduationCap className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                 <div>
-                  <div className="font-semibold text-slate-900">Universitet rahbari</div>
+                  <div className="font-semibold text-slate-900">Ta'lim muassasasi rahbari</div>
                   <div className="text-slate-500">{internship.universitySupervisorName}</div>
                 </div>
               </div>
@@ -410,7 +411,7 @@ export default function EvaluationDetailPage(): JSX.Element {
                     <span className="font-semibold text-slate-700">{finalResult.companyTotalScore} ball</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Universitet baho:</span>
+                    <span>Muassasa bahosi:</span>
                     <span className="font-semibold text-slate-700">{finalResult.universityTotalScore} ball</span>
                   </div>
                   <div className="flex justify-between border-t border-emerald-100 pt-1 mt-1">
@@ -419,7 +420,7 @@ export default function EvaluationDetailPage(): JSX.Element {
                   </div>
                 </div>
                 <div className="mt-3 p-2 bg-emerald-100/50 rounded-lg text-[11px] text-emerald-700 text-left">
-                  <strong>Hisoblash usuli:</strong> Korxona va universitet rahbarlarining yakunlangan
+                  <strong>Hisoblash usuli:</strong> Korxona va ta'lim muassasasi rahbarlarining yakunlangan
                   baholari o'rtacha hisoblanadi: ({finalResult.companyTotalScore} + {finalResult.universityTotalScore}) ÷ 2
                   = {finalResult.finalScore}
                 </div>
@@ -489,7 +490,7 @@ export default function EvaluationDetailPage(): JSX.Element {
                   title={
                     evaluatorRole === 'COMPANY_SUPERVISOR'
                       ? 'Korxona rahbari bahosi'
-                      : 'Universitet rahbari bahosi'
+                      : "Ta'lim muassasasi rahbari bahosi"
                   }
                   subtitle={
                     canEdit
@@ -662,14 +663,14 @@ export default function EvaluationDetailPage(): JSX.Element {
           <Card className="p-5 border-slate-200/80 space-y-4">
             <SectionHeader
               title="Mezonlar bo'yicha qiyosiy tahlil"
-              subtitle="Korxona va universitet rahbarlarining ballari"
+              subtitle="Korxona va ta'lim muassasasi rahbarlarining ballari"
             />
 
             {/* The other supervisor's evaluation — readonly view for supervisors */}
             {user?.role === 'COMPANY_SUPERVISOR' && universityEvaluation ? (
               <div className="mb-4 p-4 rounded-xl bg-blue-50/40 border border-blue-100">
                 <div className="text-xs font-semibold text-blue-800 mb-2">
-                  Universitet rahbari bahosi — {universityEvaluation.evaluatorName}
+                  Ta'lim muassasasi rahbari bahosi — {universityEvaluation.evaluatorName}
                   {universityEvaluation.status === 'SUBMITTED' && (
                     <span className="ml-2 text-[10px] font-normal text-blue-600">
                       (Jami: {universityEvaluation.totalScore} ball)
@@ -788,14 +789,14 @@ export default function EvaluationDetailPage(): JSX.Element {
             <div className="space-y-4">
               {[
                 { label: 'Korxona rahbari bahosi', data: companyEvaluation, colorClass: 'bg-indigo-400' },
-                { label: 'Universitet rahbari bahosi', data: universityEvaluation, colorClass: 'bg-blue-400' },
+                { label: "Ta'lim muassasasi rahbari bahosi", data: universityEvaluation, colorClass: 'bg-blue-400' },
               ].map(({ label, data, colorClass }) =>
                 data ? (
                   <Card key={label} className="p-5 border-slate-200/80 space-y-3">
                     <div className="flex items-center justify-between">
                       <SectionHeader
                         title={label}
-                        subtitle={`${data.evaluatorName} · ${data.submittedAt ? new Date(data.submittedAt).toLocaleDateString('uz-UZ') : 'Qoralama'}`}
+                        subtitle={`${data.evaluatorName} · ${data.submittedAt ? formatDate(data.submittedAt) : 'Qoralama'}`}
                       />
                       <span
                         className={`text-lg font-bold ${

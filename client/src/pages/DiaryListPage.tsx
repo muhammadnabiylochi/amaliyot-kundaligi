@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import {
   Plus,
   Search,
@@ -10,30 +11,43 @@ import {
   Building2,
   CheckCircle2,
 } from 'lucide-react';
-import { formatDate, MockDiaryEntry } from '@/data/mock';
+import { formatDate, MockDiaryEntry } from '@/lib/types';
 import { fetchDiaryEntries } from '@/lib/dataService';
 import { Card, Button, Input } from '@/components/ui';
 import { StatusBadge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/FeedbackStates';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/FeedbackStates';
 import { AttachmentSection } from '@/components/AttachmentSection';
 import { ExportButtons } from '@/components/ExportButtons';
 
 export default function DiaryListPage() {
+  const [params] = useSearchParams();
+  const { user } = useAuth();
+  const canWrite = user?.role === 'STUDENT';
   const [entries, setEntries] = useState<MockDiaryEntry[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(params.get('search') ?? '');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [selectedEntry, setSelectedEntry] = useState<MockDiaryEntry | null>(null);
 
   useEffect(() => {
+    setSearchTerm(params.get('search') ?? '');
+  }, [params]);
+
+  const load = () => {
     let mounted = true;
-    fetchDiaryEntries().then((data) => {
-      if (mounted) setEntries(data);
-    });
+    setLoading(true);
+    setLoadError(null);
+    fetchDiaryEntries({ limit: 100 })
+      .then((data) => mounted && setEntries(data))
+      .catch((e) => mounted && setLoadError(e.message))
+      .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
     };
-  }, []);
+  };
+  useEffect(load, []);
 
   // Extract unique companies for filtering
   const companies = Array.from(new Set(entries.map((e) => e.company)));
@@ -42,7 +56,8 @@ export default function DiaryListPage() {
     const matchesSearch =
       entry.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.content.toLowerCase().includes(searchTerm.toLowerCase());
+      entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.company.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
     const matchesCompany = companyFilter === 'all' || entry.company === companyFilter;
     return matchesSearch && matchesStatus && matchesCompany;
@@ -66,14 +81,19 @@ export default function DiaryListPage() {
             excelUrl={`/api/reports/diary/excel${statusFilter !== 'all' ? `?status=${statusFilter}` : ''}`}
             baseFilename="kundalik_hisoboti"
           />
-          <Link to="/diary/new">
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Yangi yozuv qo'shish
-            </Button>
-          </Link>
+          {canWrite && (
+            <Link to="/diary/new">
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Yangi yozuv qo'shish
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
+
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+      {loading && !loadError && <LoadingState />}
 
       {/* Filter and Search Bar */}
       <Card className="p-4 border-slate-200/80">

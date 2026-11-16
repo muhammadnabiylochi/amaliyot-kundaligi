@@ -20,7 +20,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer, { MulterError } from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import {
@@ -51,7 +51,7 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${ext}`);
+    cb(null, `${randomUUID()}${ext}`);
   },
 });
 

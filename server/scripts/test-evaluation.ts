@@ -449,6 +449,11 @@ async function runEvaluationTests() {
       await prisma.diaryEntry.delete({ where: { id: createdApprovedEntryId } });
     }
 
+    // Restore state so other test scripts are not order-dependent:
+    // submitting both evaluations marks the internship COMPLETED — bring it back to ACTIVE.
+    await prisma.finalEvaluation.deleteMany({ where: { internshipId: internship!.id } });
+    await prisma.internship.update({ where: { id: internship!.id }, data: { status: 'ACTIVE' } });
+
   } finally {
     server.close();
     await prisma.$disconnect();

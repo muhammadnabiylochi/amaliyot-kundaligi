@@ -17,3 +17,10 @@ ReactDOM.createRoot(rootElement).render(
     </BrowserRouter>
   </React.StrictMode>,
 );
+
+// PWA: register the service worker in production builds only (dev uses Vite HMR)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('[PWA] service worker registration failed:', err));
+  });
+}

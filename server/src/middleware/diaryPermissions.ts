@@ -64,7 +64,7 @@ export const isStudentOwnerOfEntry = async (
 /**
  * canViewEntry
  * — Foydalanuvchi kundalikni ko'ra olishini tekshiradi:
- *   talaba (egasi), biriktirilgan korxona rahbari yoki universitet rahbari.
+ *   talaba (egasi), biriktirilgan korxona rahbari yoki ta'lim muassasasi rahbari.
  */
 export const canViewEntry = async (
   req: Request,

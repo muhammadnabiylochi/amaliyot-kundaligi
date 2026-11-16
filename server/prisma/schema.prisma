@@ -61,6 +61,9 @@ model User {
   passwordHash String
   role         UserRole  @default(STUDENT)
   isActive     Boolean   @default(true)
+  phone        String?
+  position     String?
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -138,6 +141,8 @@ model Internship {
   startDate              DateTime         @db.Date
   endDate                DateTime         @db.Date
   status                 InternshipStatus @default(ACTIVE)
+  position               String?
+  programDescription     String?          @db.Text
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -150,6 +155,7 @@ model Internship {
   attendances  Attendance[]
   grades       InternshipGrade[]
   finalEvaluations FinalEvaluation[]
+  planItems    InternshipPlanItem[]
 
   @@index([studentId])
   @@index([companyId])
@@ -167,11 +173,13 @@ model DiaryEntry {
   result       String?          @db.Text
   hours        Decimal          @default(8.0) @db.Decimal(4, 1)
   status       DiaryEntryStatus @default(DRAFT)
+  planItemId   String?
   submittedAt  DateTime?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
   internship Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  planItem   InternshipPlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
 
   attachments DiaryAttachment[]
   reviews     DiaryReview[]
@@ -181,6 +189,24 @@ model DiaryEntry {
   @@index([internshipId])
   @@index([status])
   @@index([entryDate])
+  @@index([planItemId])
+}
+
+/// Internship programme (plan) item: topic + planned hours. Diary entries link to it.
+model InternshipPlanItem {
+  id           String   @id @default(cuid())
+  internshipId String
+  orderIndex   Int      @default(0)
+  title        String
+  description  String?  @db.Text
+  plannedHours Decimal  @default(8.0) @db.Decimal(5, 1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  internship   Internship   @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  diaryEntries DiaryEntry[]
+
+  @@index([internshipId])
 }
 
 /// Attachments/evidence uploaded for a diary entry

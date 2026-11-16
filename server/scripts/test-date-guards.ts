@@ -25,7 +25,22 @@ async function runEdgeCaseTests() {
   const internship = await prisma.internship.findFirst({ where: { studentId: student!.id } });
   assert(Boolean(student && internship), 'Talaba va amaliyot dasturi mavjud');
 
-  // Case A: Bugungi sana (2026-10-28) da bazada APPROVED yozuv mavjudligini tasdiqlash
+  // Setup: the test must not depend on other scripts — ensure an APPROVED entry exists on 2026-10-28
+  await prisma.diaryEntry.upsert({
+    where: { internshipId_entryDate: { internshipId: internship!.id, entryDate: new Date('2026-10-28') } },
+    update: { status: 'APPROVED' },
+    create: {
+      internshipId: internship!.id,
+      entryDate: new Date('2026-10-28'),
+      taskTitle: 'Tasdiqlangan test yozuvi',
+      description: 'Sana himoyasi testi uchun tasdiqlangan yozuv',
+      hours: 8,
+      status: 'APPROVED',
+      submittedAt: new Date('2026-10-28T18:00:00Z'),
+    },
+  });
+
+  // Case A: 2026-10-28 da bazada APPROVED yozuv mavjudligini tasdiqlash
   const approvedOn28 = await prisma.diaryEntry.findUnique({
     where: {
       internshipId_entryDate: {

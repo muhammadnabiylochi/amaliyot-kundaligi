@@ -1,15 +1,22 @@
-import { api } from './api';
-import {
-  MOCK_DIARY_ENTRIES,
-  MOCK_INTERNSHIPS,
-  MOCK_USERS,
+import { api, apiData, ApiError, authHeaders, BASE_URL, NETWORK_ERROR_MESSAGE } from './api';
+import type {
+  AppUser,
+  Analytics,
+  Company,
+  DiaryEntry,
+  Internship,
+  InternshipDetail,
+  JournalData,
+  NotificationItem,
+  PlanItem,
+  StudentGroup,
   MockDiaryEntry,
   MockInternship,
   MockUser,
-  getDashboardStats,
-} from '@/data/mock';
+} from './types';
 
 export type { MockDiaryEntry, MockInternship, MockUser };
+export { ApiError };
 
 export interface DashboardStatsResponse {
   totalDays: number;
@@ -22,184 +29,229 @@ export interface DashboardStatsResponse {
   totalApprovedHours?: number;
 }
 
-/**
- * Fetch live dashboard stats from PostgreSQL.
- * Gracefully falls back to mock stats if backend is unreachable or not yet populated.
- */
-export async function fetchDashboardStats(): Promise<DashboardStatsResponse> {
-  try {
-    const res = await api.get<{ success: boolean; data: DashboardStatsResponse }>('/api/dashboard/stats');
-    if (res.ok && res.data?.data) {
-      return res.data.data;
-    }
-  } catch (err) {
-    console.warn('[DataService] /api/dashboard/stats fallback to mock:', err);
-  }
-  return getDashboardStats();
+/** Live dashboard counters (throws ApiError on failure — no mock fallback). */
+export function fetchDashboardStats(): Promise<DashboardStatsResponse> {
+  return apiData<DashboardStatsResponse>('get', '/api/dashboard/stats');
 }
 
-/**
- * Fetch diary entries from PostgreSQL.
- */
-export async function fetchDiaryEntries(params?: {
-  status?: string;
-  search?: string;
-  limit?: number;
-}): Promise<MockDiaryEntry[]> {
-  try {
-    const query = new URLSearchParams();
-    if (params?.status && params.status !== 'all') query.set('status', params.status);
-    if (params?.search) query.set('search', params.search);
-    if (params?.limit) query.set('limit', String(params.limit));
-
-    const path = `/api/diary${query.toString() ? `?${query.toString()}` : ''}`;
-    const res = await api.get<{ success: boolean; data: MockDiaryEntry[] }>(path);
-
-    if (res.ok && Array.isArray(res.data?.data) && res.data.data.length > 0) {
-      return res.data.data;
-    }
-  } catch (err) {
-    console.warn('[DataService] /api/diary fallback to mock:', err);
-  }
-  return MOCK_DIARY_ENTRIES;
+/** Aggregated chart data (diary status, attendance, weekly dynamics, groups, companies). */
+export function fetchAnalytics(weeks = 8): Promise<Analytics> {
+  return apiData<Analytics>('get', `/api/dashboard/analytics?weeks=${weeks}`);
 }
 
-/**
- * Fetch single diary entry
- */
-export async function fetchDiaryEntryById(id: string): Promise<MockDiaryEntry | null> {
-  try {
-    const res = await api.get<{ success: boolean; data: MockDiaryEntry }>(`/api/diary/${id}`);
-    if (res.ok && res.data?.data) {
-      return res.data.data;
-    }
-  } catch (err) {
-    console.warn('[DataService] /api/diary/:id fallback:', err);
-  }
-  return MOCK_DIARY_ENTRIES.find((e) => e.id === id) || null;
+/** Diary entries for the current user (role scoped on the server). */
+export async function fetchDiaryEntries(params?: { status?: string; search?: string; limit?: number }): Promise<DiaryEntry[]> {
+  const query = new URLSearchParams();
+  if (params?.status && params.status !== 'all') query.set('status', params.status);
+  if (params?.search) query.set('search', params.search);
+  if (params?.limit) query.set('limit', String(params.limit));
+  const qs = query.toString();
+  return (await apiData<DiaryEntry[]>('get', `/api/diary${qs ? `?${qs}` : ''}`)) ?? [];
 }
 
-/**
- * Save brand NEW diary entry (POST /api/diary)
- */
-export async function createDiaryEntry(payload: {
+/** Single diary entry or null when not found / not accessible. */
+export async function fetchDiaryEntryById(id: string): Promise<DiaryEntry | null> {
+  try {
+    return await apiData<DiaryEntry>('get', `/api/diary/${id}`);
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 404 || e.status === 403)) return null;
+    throw e;
+  }
+}
+
+type DiaryPayload = {
   internshipId?: string;
-  entryDate: string;
-  taskTitle: string;
-  description: string;
+  entryDate?: string;
+  taskTitle?: string;
+  description?: string;
   result?: string;
   hours?: number;
-  status: 'DRAFT' | 'SUBMITTED';
-}): Promise<{ ok: boolean; data?: any; error?: string }> {
+  status?: 'DRAFT' | 'SUBMITTED';
+  planItemId?: string | null;
+};
+
+async function mutate(method: 'post' | 'patch', path: string, payload: unknown): Promise<{ ok: boolean; data?: any; error?: string }> {
   try {
-    const res = await api.post<{ success: boolean; data?: any; error?: { message: string } }>('/api/diary', payload);
-    if (!res.ok) {
-      const errorMessage = res.data?.error?.message || "Serverda xatolik yuz berdi.";
-      return { ok: false, error: errorMessage };
-    }
-    return { ok: true, data: res.data?.data };
+    const res = await api[method]<{ success: boolean; data?: any; message?: string; error?: { message: string } }>(path, payload);
+    if (!res.ok) return { ok: false, error: res.data?.error?.message || 'Serverda xatolik yuz berdi.' };
+    return { ok: true, data: res.data?.data ?? res.data?.message };
   } catch (err: any) {
-    console.error('[DataService] createDiaryEntry error:', err);
-    return { ok: false, error: err.message || "Server bilan aloqa uzildi." };
+    return { ok: false, error: err.message || NETWORK_ERROR_MESSAGE };
   }
 }
 
-/**
- * Update EXISTING diary entry (PATCH /api/diary/:id)
- */
-export async function updateDiaryEntry(
-  id: string,
-  payload: {
-    entryDate?: string;
-    taskTitle?: string;
-    description?: string;
-    result?: string;
-    hours?: number;
-    status?: 'DRAFT' | 'SUBMITTED';
-  }
-): Promise<{ ok: boolean; data?: any; error?: string }> {
-  try {
-    const res = await api.patch<{ success: boolean; data?: any; error?: { message: string } }>(`/api/diary/${id}`, payload);
-    if (!res.ok) {
-      const errorMessage = res.data?.error?.message || "Serverda xatolik yuz berdi.";
-      return { ok: false, error: errorMessage };
-    }
-    return { ok: true, data: res.data?.data };
-  } catch (err: any) {
-    console.error('[DataService] updateDiaryEntry error:', err);
-    return { ok: false, error: err.message || "Server bilan aloqa uzildi." };
-  }
+export function createDiaryEntry(payload: DiaryPayload & { entryDate: string; taskTitle: string; description: string; status: 'DRAFT' | 'SUBMITTED' }) {
+  return mutate('post', '/api/diary', payload);
 }
 
-/**
- * Unified save handler for backward compatibility
- */
-export async function saveDiaryEntry(
-  payload: {
-    internshipId?: string;
-    entryDate: string;
-    taskTitle: string;
-    description: string;
-    result?: string;
-    hours?: number;
-    status: 'DRAFT' | 'SUBMITTED';
-  },
-  existingId?: string
-): Promise<{ ok: boolean; data?: any; error?: string }> {
-  if (existingId) {
-    return updateDiaryEntry(existingId, payload);
-  }
-  return createDiaryEntry(payload);
+export function updateDiaryEntry(id: string, payload: DiaryPayload) {
+  return mutate('patch', `/api/diary/${id}`, payload);
 }
 
-/**
- * Submit supervisor review
- */
-export async function submitDiaryReview(
-  entryId: string,
-  payload: { decision: 'approved' | 'rejected'; comment: string }
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await api.post<{ success: boolean; error?: { message: string } }>(`/api/diary/${entryId}/review`, payload);
-    if (!res.ok) {
-      return { ok: false, error: res.data?.error?.message || "Xatolik yuz berdi" };
-    }
-    return { ok: true };
-  } catch (err: any) {
-    console.error('[DataService] submitDiaryReview error:', err);
-    return { ok: false, error: err.message };
-  }
+export function saveDiaryEntry(
+  payload: DiaryPayload & { entryDate: string; taskTitle: string; description: string; status: 'DRAFT' | 'SUBMITTED' },
+  existingId?: string,
+) {
+  return existingId ? updateDiaryEntry(existingId, payload) : createDiaryEntry(payload);
 }
 
-/**
- * Fetch internships
- */
-export async function fetchInternships(): Promise<MockInternship[]> {
-  try {
-    const res = await api.get<{ success: boolean; data: MockInternship[] }>('/api/internships');
-    if (res.ok && Array.isArray(res.data?.data) && res.data.data.length > 0) {
-      return res.data.data;
-    }
-  } catch (err) {
-    console.warn('[DataService] /api/internships fallback to mock:', err);
-  }
-  return MOCK_INTERNSHIPS;
+export async function submitDiaryReview(entryId: string, payload: { decision: 'approved' | 'rejected' | 'returned'; comment: string }): Promise<{ ok: boolean; error?: string }> {
+  const r = await mutate('post', `/api/diary/${entryId}/review`, payload);
+  return { ok: r.ok, error: r.error };
 }
 
-/**
- * Fetch users
- */
-export async function fetchUsers(): Promise<MockUser[]> {
-  try {
-    const res = await api.get<{ success: boolean; data: MockUser[] }>('/api/users');
-    if (res.ok && Array.isArray(res.data?.data) && res.data.data.length > 0) {
-      return res.data.data;
-    }
-  } catch (err) {
-    console.warn('[DataService] /api/users fallback to mock:', err);
-  }
-  return MOCK_USERS;
+// ── Internships, plan ───────────────────────────────────────────────────────
+
+export async function fetchInternships(params?: { status?: string; groupId?: string }): Promise<Internship[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.groupId) q.set('groupId', params.groupId);
+  const qs = q.toString();
+  return (await apiData<Internship[]>('get', `/api/internships${qs ? `?${qs}` : ''}`)) ?? [];
 }
+
+export function fetchInternshipDetail(id: string): Promise<InternshipDetail> {
+  return apiData<InternshipDetail>('get', `/api/internships/${id}`);
+}
+
+export async function fetchMyInternshipId(): Promise<string | null> {
+  const r = await apiData<{ id: string } | null>('get', '/api/internships/mine');
+  return r?.id ?? null;
+}
+
+export interface InternshipPayload {
+  studentId: string;
+  companyId: string;
+  companySupervisorId?: string | null;
+  universitySupervisorId?: string | null;
+  startDate: string;
+  endDate: string;
+  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  position?: string | null;
+  programDescription?: string | null;
+}
+
+export const createInternship = (p: InternshipPayload) => apiData<{ id: string }>('post', '/api/internships', p);
+export const updateInternship = (id: string, p: Partial<InternshipPayload>) => apiData<void>('patch', `/api/internships/${id}`, p);
+export const deleteInternship = (id: string) => apiData<void>('delete', `/api/internships/${id}`);
+
+export async function fetchPlan(internshipId: string): Promise<PlanItem[]> {
+  return (await apiData<PlanItem[]>('get', `/api/internships/${internshipId}/plan`)) ?? [];
+}
+export const createPlanItem = (internshipId: string, p: { title: string; description?: string | null; plannedHours: number }) =>
+  apiData<PlanItem>('post', `/api/internships/${internshipId}/plan`, p);
+export const updatePlanItem = (
+  internshipId: string,
+  itemId: string,
+  p: Partial<{ title: string; description: string | null; plannedHours: number; orderIndex: number }>,
+) => apiData<PlanItem>('patch', `/api/internships/${internshipId}/plan/${itemId}`, p);
+export const deletePlanItem = (internshipId: string, itemId: string) => apiData<void>('delete', `/api/internships/${internshipId}/plan/${itemId}`);
+
+// ── Catalog: companies, groups ──────────────────────────────────────────────
+
+export async function fetchCompanies(): Promise<Company[]> {
+  return (await apiData<Company[]>('get', '/api/companies')) ?? [];
+}
+export const createCompany = (p: Partial<Company>) => apiData<Company>('post', '/api/companies', p);
+export const updateCompany = (id: string, p: Partial<Company>) => apiData<Company>('patch', `/api/companies/${id}`, p);
+export const deleteCompany = (id: string) => apiData<void>('delete', `/api/companies/${id}`);
+
+export async function fetchGroups(): Promise<StudentGroup[]> {
+  return (await apiData<StudentGroup[]>('get', '/api/groups')) ?? [];
+}
+export const createGroup = (p: Partial<StudentGroup>) => apiData<StudentGroup>('post', '/api/groups', p);
+export const updateGroup = (id: string, p: Partial<StudentGroup>) => apiData<StudentGroup>('patch', `/api/groups/${id}`, p);
+export const deleteGroup = (id: string) => apiData<void>('delete', `/api/groups/${id}`);
+
+// ── Users ───────────────────────────────────────────────────────────────────
+
+export async function fetchUsers(params?: { role?: string; groupId?: string }): Promise<AppUser[]> {
+  const q = new URLSearchParams();
+  if (params?.role) q.set('role', params.role);
+  if (params?.groupId) q.set('groupId', params.groupId);
+  const qs = q.toString();
+  return (await apiData<AppUser[]>('get', `/api/users${qs ? `?${qs}` : ''}`)) ?? [];
+}
+
+export interface UserPayload {
+  fullName: string;
+  email: string;
+  role: 'ADMIN' | 'STUDENT' | 'COMPANY_SUPERVISOR' | 'UNIVERSITY_SUPERVISOR';
+  phone?: string | null;
+  position?: string | null;
+  groupId?: string | null;
+  studentNumber?: string | null;
+}
+
+export const createUser = (p: UserPayload) => apiData<{ user: AppUser; tempPassword: string }>('post', '/api/users', p);
+export const updateUser = (id: string, p: Partial<UserPayload>) => apiData<AppUser>('patch', `/api/users/${id}`, p);
+export const resetUserPassword = (id: string) => apiData<{ tempPassword: string }>('post', `/api/users/${id}/reset-password`, {});
+
+export interface ImportResult {
+  created: number;
+  skipped: number;
+  errors: number;
+  results: { row: number; fullName: string; email: string; role?: string; status: 'created' | 'skipped' | 'error'; message?: string; tempPassword?: string }[];
+}
+
+export async function importUsers(file: File): Promise<ImportResult> {
+  const fd = new FormData();
+  fd.append('file', file);
+  return apiData<ImportResult>('post', '/api/users/import', fd);
+}
+
+/** Toggle user active status. Returns the new isActive value, throws on error. */
+export async function toggleUserStatus(userId: string): Promise<boolean> {
+  const r = await apiData<{ isActive: boolean }>('patch', `/api/users/${userId}/toggle-status`, {});
+  return r.isActive;
+}
+
+// ── Own account ─────────────────────────────────────────────────────────────
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  mutate('post', '/api/auth/change-password', { currentPassword, newPassword });
+export const updateOwnProfile = (p: { phone: string | null }) => mutate('patch', '/api/auth/profile', p);
+
+// ── Journal, notifications, verification ────────────────────────────────────
+
+export function fetchJournal(month: string, groupId?: string): Promise<JournalData> {
+  const q = new URLSearchParams({ month });
+  if (groupId && groupId !== 'all') q.set('groupId', groupId);
+  return apiData<JournalData>('get', `/api/journal?${q.toString()}`);
+}
+
+export async function fetchNotifications(): Promise<NotificationItem[]> {
+  return (await apiData<NotificationItem[]>('get', '/api/notifications')) ?? [];
+}
+
+export async function sendReminder(internshipId: string): Promise<string> {
+  const res = await api.post<{ message?: string; error?: { message: string } }>(`/api/notifications/remind/${internshipId}`, {});
+  if (!res.ok) throw new ApiError(res.data?.error?.message || 'Eslatma yuborilmadi', res.status);
+  return res.data?.message || 'Eslatma yuborildi';
+}
+
+export interface VerificationResult {
+  studentName: string;
+  groupName: string | null;
+  studyProgram: string | null;
+  company: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  approvedEntries: number;
+  approvedHours: number;
+  attendanceRate: number | null;
+  finalScore: number | null;
+  grade: string;
+  maxScore: number;
+  checkedAt: string;
+}
+
+export function verifyDocument(internshipId: string, code: string): Promise<VerificationResult> {
+  return apiData<VerificationResult>('get', `/api/public/verify/${encodeURIComponent(internshipId)}?c=${encodeURIComponent(code)}`);
+}
+
+export { authHeaders, BASE_URL };
 
 export interface AttendanceRecord {
   id: string;
@@ -248,10 +300,11 @@ export async function fetchAttendance(params?: {
     if (res.ok && Array.isArray(res.data?.data)) {
       return res.data.data;
     }
+    throw new ApiError((res.data as any)?.error?.message || "Davomat ma'lumotlarini yuklab bo'lmadi", res.status);
   } catch (err) {
     console.warn('[DataService] fetchAttendance error:', err);
+    throw err;
   }
-  return [];
 }
 
 /**
@@ -305,18 +358,6 @@ export async function recordAttendance(payload: {
   } catch (err: any) {
     console.error('[DataService] recordAttendance error:', err);
     return { ok: false, error: err.message || "Server bilan aloqa uzildi." };
-  }
-}
-
-/**
- * Toggle user active status
- */
-export async function toggleUserStatus(userId: string): Promise<boolean> {
-  try {
-    const res = await api.patch<{ success: boolean }>(`/api/users/${userId}/toggle-status`, {});
-    return res.ok;
-  } catch {
-    return false;
   }
 }
 
@@ -519,36 +560,8 @@ export async function fetchDiaryAttachments(
   return res.data.attachments ?? [];
 }
 
-export function downloadAttachment(
-  attachmentId: string,
-  originalName?: string
-): void {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-  const url = `${BASE}/api/diary/attachments/${attachmentId}`;
-
-  fetch(url, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-    .then((resp) => {
-      if (!resp.ok) throw new Error('Fayl yuklab olishda xato');
-      return resp.blob();
-    })
-    .then((blob) => {
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = originalName ?? 'download';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(objectUrl);
-    })
-    .catch((err) => {
-      console.error('[downloadAttachment]', err);
-      alert("Faylni yuklab olishda xato yuz berdi. Qaytadan urinib ko'ring.");
-    });
+export async function downloadAttachment(attachmentId: string, originalName?: string): Promise<void> {
+  await downloadReport(`/api/diary/attachments/${attachmentId}`, originalName ?? 'download');
 }
 
 export async function deleteAttachment(attachmentId: string): Promise<void> {
@@ -567,14 +580,12 @@ export async function downloadReport(
   urlPath: string,
   filename: string
 ): Promise<void> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-  const url = `${BASE}${urlPath}`;
-
-  const resp = await fetch(url, {
-    credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  let resp: Response;
+  try {
+    resp = await fetch(`${BASE_URL}${urlPath}`, { credentials: 'include', headers: authHeaders() });
+  } catch {
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0);
+  }
 
   if (!resp.ok) {
     let errorMsg = 'Hisobotni yuklab olishda xatolik yuz berdi';
